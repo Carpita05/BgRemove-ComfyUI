@@ -1,0 +1,161 @@
+:root {
+    --bg-dark: #0f172a;
+    /* Azul noche profundo */
+    --card-bg: rgba(30, 41, 59, 0.7);
+    /* Transparente efecto cristal */
+    --neon-purple: #a855f7;
+    --neon-blue: #3b82f6;
+    --neon-red: #ef4444;
+    --text-bright: #f8fafc;
+    --border-glow: rgba(168, 85, 247, 0.4);
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    background: radial-gradient(circle at top, #1e1b4b, #0f172a);
+    color: var(--text-bright);
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    /* Permite scroll si el contenido es largo */
+    min-height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Contenedor Vertical Simple */
+.container,
+.card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-glow);
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 15px var(--border-glow);
+    width: 100%;
+    max-width: 600px;
+    /* Ancho cómodo para escritorio y móvil */
+    text-align: center;
+    animation: fadeIn 0.6s ease-out;
+}
+
+header h1 {
+    font-size: 1.8rem;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple), var(--neon-red));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+/* Secciones de Formulario */
+section {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+label {
+    display: block;
+    color: var(--neon-blue);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+input,
+select {
+    width: 100%;
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: white;
+    font-size: 1rem;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 10px var(--neon-purple);
+}
+
+/* Botones con efecto Glow */
+button,
+.btn-send {
+    width: 100%;
+    background: linear-gradient(45deg, var(--secondary), var(--neon-purple));
+    background-color: var(--neon-purple);
+    /* Fallback */
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.3s;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+}
+
+button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 25px var(--neon-purple);
+}
+
+/* Barra de carga técnica */
+.bar {
+    height: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-red));
+    width: 0%;
+    animation: load 8s forwards;
+}
+
+@keyframes load {
+    to {
+        width: 100%;
+    }
+}
+
+/* Imagen de resultado */
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid var(--neon-blue);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .container {
+        padding: 1.5rem;
+    }
+
+    header h1 {
+        font-size: 1.5rem;
+    }
+}

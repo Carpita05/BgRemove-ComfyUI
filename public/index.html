@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AreaVR - BG Remover</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>AreaVR - BG Remover</h1>
+            <p style="color: #94a3b8;">Terminal de procesamiento de imágenes</p>
+        </header>
+
+        <form action="/procesar-imagen" method="POST" enctype="multipart/form-data">
+            <section>
+                <label>Archivo de Entrada</label>
+                <input type="file" name="foto_cliente" accept="image/*" required>
+            </section>
+
+            <section>
+                <label>Identificador de Logo</label>
+                <select name="logo_empresa" required>
+                    <option value="AreaVResLogo-768x563.png">Logo AreaVR (Principal)</option>
+                    <option value="logo_blanco.png">Variante Luz (Blanco)</option>
+                    <option value="logo_negro.png">Variante Sombra (Negro)</option>
+                </select>
+            </section>
+
+            <section>
+                <label>Sujeto / Cliente</label>
+                <input type="text" name="nombre_cliente" placeholder="Nombre para el registro" required>
+            </section>
+
+            <section>
+                <label>Canal WhatsApp</label>
+                <input type="tel" name="telefono" placeholder="Número de contacto" required>
+            </section>
+
+            <button type="submit">Iniciar Secuencia de Generación</button>
+        </form>
+    </div>
+</body>
+
+</html>

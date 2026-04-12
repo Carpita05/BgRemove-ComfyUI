@@ -1,0 +1,190 @@
+{
+  "1": {
+    "inputs": {
+      "image": "personas (1).jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "3": {
+    "inputs": {
+      "image": "fondo (1).jpg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "5": {
+    "inputs": {
+      "filename_prefix": "Resultado",
+      "images": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "7": {
+    "inputs": {
+      "x": 115,
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "3",
+        0
+      ],
+      "source": [
+        "15",
+        0
+      ],
+      "mask": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "13": {
+    "inputs": {
+      "image": "AreaVResLogo-768x563.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "15": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.multiplier": 3.04,
+      "scale_method": "bilinear",
+      "input": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "Resize Image/Mask"
+    }
+  },
+  "16": {
+    "inputs": {
+      "x": 0,
+      "y": 20,
+      "resize_source": false,
+      "destination": [
+        "7",
+        0
+      ],
+      "source": [
+        "17",
+        0
+      ],
+      "mask": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "ImageCompositeMasked"
+    }
+  },
+  "17": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.multiplier": 0.16,
+      "scale_method": "area",
+      "input": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "Resize Image/Mask"
+    }
+  },
+  "18": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.multiplier": 3.04,
+      "scale_method": "bilinear",
+      "input": [
+        "25",
+        1
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "Resize Image/Mask"
+    }
+  },
+  "19": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.multiplier": 0.16,
+      "scale_method": "area",
+      "input": [
+        "24",
+        1
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "Resize Image/Mask"
+    }
+  },
+  "24": {
+    "inputs": {
+      "model": "INSPYRENET",
+      "sensitivity": 1,
+      "process_res": 1024,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "refine_foreground": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "image": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "RMBG",
+    "_meta": {
+      "title": "Remove Background (RMBG)"
+    }
+  },
+  "25": {
+    "inputs": {
+      "model": "BEN2",
+      "sensitivity": 1,
+      "process_res": 1024,
+      "mask_blur": 0,
+      "mask_offset": 0,
+      "invert_output": false,
+      "refine_foreground": false,
+      "background": "Alpha",
+      "background_color": "#222222",
+      "image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "RMBG",
+    "_meta": {
+      "title": "Remove Background (RMBG)"
+    }
+  }
+}
