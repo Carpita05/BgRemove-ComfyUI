@@ -1,4 +1,4 @@
-﻿🚀 IA Branding System - Terminal de Generación Corporativa
+﻿🚀 IA BackgroundRemover con ComfyUI
 Este proyecto es una aplicación web de alto rendimiento que integra ComfyUI con un servidor Node.js para automatizar la creación de branding corporativo. El sistema detecta y recorta sujetos mediante IA, los integra en un entorno de marca y envía el resultado final por WhatsApp.
 ________________
 
