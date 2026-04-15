@@ -14,7 +14,7 @@ const COMFY_URL = 'http://127.0.0.1:8188';
 
 const ID_NODO_LOGO = "13";
 const PLACE_ID = "ChIJvyh80bMpQg0RYBgqWBQvZ4o"; // Tu Place ID
-const GOOGLE_REVIEW_URL = `https://search.google.com/local/writereview?placeid=${PLACE_ID}`;
+const GOOGLE_REVIEW_URL = `https://g.page/r/CWAYKlgUL2eKEAE/review`;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
