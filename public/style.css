@@ -1,161 +1,506 @@
-:root {
-    --bg-dark: #0f172a;
-    /* Azul noche profundo */
-    --card-bg: rgba(30, 41, 59, 0.7);
-    /* Transparente efecto cristal */
-    --neon-purple: #a855f7;
-    --neon-blue: #3b82f6;
-    --neon-red: #ef4444;
-    --text-bright: #f8fafc;
-    --border-glow: rgba(168, 85, 247, 0.4);
+/* ==========================================================================
+   BASE STYLESHEET — BgRemove ComfyUI
+   Estrategia: Mobile-First | Vanilla CSS | Sin dependencias externas
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   0. ESSENTIAL RESET
+   Garantiza consistencia cross-browser sin sobrecarga de recursos.
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-body {
-    font-family: 'Segoe UI', Roboto, sans-serif;
-    background: radial-gradient(circle at top, #1e1b4b, #0f172a);
-    color: var(--text-bright);
-    margin: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    /* Permite scroll si el contenido es largo */
-    min-height: 100vh;
-    padding: 20px;
-    box-sizing: border-box;
+html {
+  /* Evita saltos de scroll por scrollbar que aparece/desaparece */
+  scrollbar-gutter: stable;
+  /* Mejora el renderizado de fuentes en iOS */
+  -webkit-text-size-adjust: 100%;
 }
 
-/* Contenedor Vertical Simple */
-.container,
-.card {
-    background: var(--card-bg);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border-glow);
-    padding: 2rem;
-    border-radius: 16px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), 0 0 15px var(--border-glow);
-    width: 100%;
-    max-width: 600px;
-    /* Ancho cómodo para escritorio y móvil */
-    text-align: center;
-    animation: fadeIn 0.6s ease-out;
-}
-
-header h1 {
-    font-size: 1.8rem;
-    background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple), var(--neon-red));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 0.5rem;
-}
-
-/* Secciones de Formulario */
-section {
-    margin-bottom: 1.5rem;
-    text-align: left;
-}
-
-label {
-    display: block;
-    color: var(--neon-blue);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
+img,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 input,
-select {
-    width: 100%;
-    padding: 12px;
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid #334155;
-    border-radius: 8px;
-    color: white;
-    font-size: 1rem;
-}
-
-input:focus {
-    outline: none;
-    border-color: var(--neon-purple);
-    box-shadow: 0 0 10px var(--neon-purple);
-}
-
-/* Botones con efecto Glow */
 button,
-.btn-send {
-    width: 100%;
-    background: linear-gradient(45deg, var(--secondary), var(--neon-purple));
-    background-color: var(--neon-purple);
-    /* Fallback */
-    color: white;
-    border: none;
-    padding: 1rem;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 1rem;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.3s;
-    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+textarea,
+select {
+  /* Los controles de formulario heredan la fuente del padre */
+  font: inherit;
 }
 
-button:hover {
-    transform: scale(1.02);
-    box-shadow: 0 0 25px var(--neon-purple);
+/* --------------------------------------------------------------------------
+   1. DESIGN TOKENS (CSS Custom Properties)
+   Cambia el tema por completo desde aquí. No toques nada más.
+   -------------------------------------------------------------------------- */
+:root {
+  /* --- Paleta de color --- */
+  --clr-bg:          #080e1c;          /* Fondo página: azul noche profundo     */
+  --clr-surface:     #0f1d35;          /* Superficie de tarjetas                */
+  --clr-surface-alt: #162340;          /* Inputs, fondos elevados               */
+  --clr-border:      #1e3252;          /* Bordes sutiles                        */
+  --clr-border-glow: rgba(99, 179, 237, 0.35); /* Glow de foco                 */
+
+  --clr-accent-1:    #63b3ed;          /* Azul cielo — principal                */
+  --clr-accent-2:    #b794f4;          /* Violeta — secundario                  */
+  --clr-accent-3:    #fc8181;          /* Coral — acciones destructivas         */
+
+  --clr-text-hi:     #f0f4ff;          /* Texto de alto contraste               */
+  --clr-text-mid:    #94a3b8;          /* Texto secundario / etiquetas          */
+  --clr-text-lo:     #4a5568;          /* Texto deshabilitado / placeholders    */
+
+  /* --- Gradientes reutilizables --- */
+  --gradient-bg:     radial-gradient(ellipse at 20% 0%, #0c1a3a 0%, #080e1c 70%);
+  --gradient-accent: linear-gradient(135deg, var(--clr-accent-1), var(--clr-accent-2));
+  --gradient-title:  linear-gradient(90deg, var(--clr-accent-1), var(--clr-accent-2), var(--clr-accent-3));
+
+  /* --- Tipografía fluida ---
+     Sintaxis clamp(min, preferido, max)
+     "preferido" usa unidades de viewport para la interpolación suave.       */
+  --font-family:     'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:       'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+
+  --fs-xs:    clamp(0.70rem, 0.65rem + 0.25vw, 0.78rem);
+  --fs-sm:    clamp(0.82rem, 0.78rem + 0.22vw, 0.92rem);
+  --fs-base:  clamp(0.95rem, 0.88rem + 0.35vw, 1.05rem);
+  --fs-md:    clamp(1.10rem, 1.00rem + 0.50vw, 1.25rem);
+  --fs-lg:    clamp(1.30rem, 1.10rem + 1.00vw, 1.65rem);
+  --fs-xl:    clamp(1.60rem, 1.20rem + 2.00vw, 2.20rem);
+  --fs-2xl:   clamp(1.90rem, 1.40rem + 2.50vw, 2.80rem);
+
+  /* --- Espaciado modular (escala × 1.5) --- */
+  --space-1:  0.25rem;   /*  4px */
+  --space-2:  0.50rem;   /*  8px */
+  --space-3:  0.75rem;   /* 12px */
+  --space-4:  1.00rem;   /* 16px */
+  --space-5:  1.50rem;   /* 24px */
+  --space-6:  2.25rem;   /* 36px */
+  --space-7:  3.50rem;   /* 56px */
+
+  /* --- Radios de borde --- */
+  --radius-sm:  6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  /* --- Sombras --- */
+  --shadow-sm:  0 1px  4px rgba(0,0,0,0.40);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.50);
+  --shadow-glow-blue:   0 0 18px rgba(99, 179, 237, 0.25);
+  --shadow-glow-violet: 0 0 18px rgba(183, 148, 244, 0.30);
+
+  /* --- Transiciones globales --- */
+  --transition-fast:   150ms ease;
+  --transition-base:   280ms ease;
+  --transition-slow:   500ms ease;
 }
 
-/* Barra de carga técnica */
+
+/* --------------------------------------------------------------------------
+   2. BASE DOCUMENT
+   -------------------------------------------------------------------------- */
+body {
+  font-family: var(--font-family);
+  font-size: var(--fs-base);
+  line-height: 1.65;
+  color: var(--clr-text-hi);
+  background: var(--clr-bg);
+  background-image: var(--gradient-bg);
+  min-height: 100dvh;
+
+  /* Layout raíz: centra el contenido de la app verticalmente */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5) var(--space-4);  /* Mobile: 24px vertical, 16px lateral */
+}
+
+/* --------------------------------------------------------------------------
+   3. LAYOUT PRINCIPAL — Grid de una columna en móvil, crece en escritorio
+   -------------------------------------------------------------------------- */
+.container {
+  position: relative;
+  z-index: 1;               /* Por encima del ::before decorativo */
+  width: 100%;
+  max-width: 640px;         /* Ancho óptimo de lectura para formularios */
+
+  /* Estilo Sólido Optimizado: Fondo opaco simple, mejor rendimiento 3D/Batería */
+  background: #0f1d35; /* Color base opaco sin transparencias costosas */
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+
+  /* Grid interno: header → form sections apilados */
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+
+  animation: fade-in-up var(--transition-slow) both;
+}
+
+/* En tablets y escritorio: más holgura */
+@media (min-width: 600px) {
+  body {
+    padding: var(--space-7) var(--space-6);
+  }
+
+  .container {
+    padding: var(--space-6);
+    gap: var(--space-6);
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   4. HEADER — Flexbox de una dimensión
+   -------------------------------------------------------------------------- */
+header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+/* Línea decorativa superior del header */
+header::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-accent);
+}
+
+header h1 {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+
+  /* Texto con gradiente — técnica CSS pura */
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+header p {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-mid);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+
+/* --------------------------------------------------------------------------
+   5. FORMULARIO — Secciones con etiquetas y campos
+   -------------------------------------------------------------------------- */
+form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--clr-accent-1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Campos de entrada base */
+input[type="text"],
+input[type="tel"],
+input[type="email"],
+input[type="password"],
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--clr-surface-alt);
+  color: var(--clr-text-hi);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  appearance: none;          /* Elimina estilos nativos del navegador */
+  -webkit-appearance: none;
+}
+
+/* Placeholder — texto guía */
+input::placeholder,
+textarea::placeholder {
+  color: var(--clr-text-lo);
+}
+
+/* Estado focus — accesibilidad + microanimación */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--clr-accent-1);
+  box-shadow: 0 0 0 3px var(--clr-border-glow), var(--shadow-glow-blue);
+}
+
+/* Select: icono de flecha personalizado */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2363b3ed' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-4) center;
+  padding-right: var(--space-6);
+  cursor: pointer;
+}
+
+/* Input file — estilo adaptado */
+input[type="file"] {
+  cursor: pointer;
+  padding: var(--space-3);
+  color: var(--clr-text-mid);
+  font-size: var(--fs-xs);
+}
+
+input[type="file"]::file-selector-button {
+  padding: var(--space-2) var(--space-4);
+  margin-right: var(--space-3);
+  background: var(--clr-surface);
+  color: var(--clr-accent-1);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--clr-accent-1);
+  color: var(--clr-bg);
+}
+
+
+/* --------------------------------------------------------------------------
+   6. BOTÓN PRINCIPAL — CTA con efecto glow
+   -------------------------------------------------------------------------- */
+button[type="submit"],
+.btn-primary {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+
+  background: var(--gradient-accent);
+  box-shadow: var(--shadow-glow-blue);
+
+  /* Transición compuesta: transform + sombra = sensación premium */
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base),
+    filter var(--transition-base);
+}
+
+button[type="submit"]:hover,
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 32px rgba(99, 179, 237, 0.45), 0 0 60px rgba(183, 148, 244, 0.20);
+  filter: brightness(1.08);
+}
+
+button[type="submit"]:active,
+.btn-primary:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+/* Estado deshabilitado — defensivo */
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+
+/* --------------------------------------------------------------------------
+   7. BARRA DE PROGRESO
+   -------------------------------------------------------------------------- */
 .bar {
-    height: 8px;
-    background: #1e293b;
-    border-radius: 4px;
-    overflow: hidden;
-    margin: 20px 0;
+  height: 6px;
+  background: var(--clr-surface-alt);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-block: var(--space-4);
 }
 
 .fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--neon-blue), var(--neon-red));
-    width: 0%;
-    animation: load 8s forwards;
+  height: 100%;
+  width: 0%;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-accent);
+  animation: progress 8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-@keyframes load {
-    to {
-        width: 100%;
-    }
+@keyframes progress {
+  to { width: 100%; }
 }
 
-/* Imagen de resultado */
-img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 12px;
-    border: 1px solid var(--neon-blue);
-    margin-bottom: 1.5rem;
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+
+/* --------------------------------------------------------------------------
+   8. IMAGEN DE RESULTADO
+   -------------------------------------------------------------------------- */
+.result-img,
+form ~ img {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--clr-border);
+  box-shadow: var(--shadow-md), var(--shadow-glow-blue);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.result-img:hover,
+form ~ img:hover {
+  transform: scale(1.01);
+  box-shadow: var(--shadow-md), 0 0 28px rgba(99, 179, 237, 0.35);
 }
 
-/* Responsive */
-@media (max-width: 480px) {
-    .container {
-        padding: 1.5rem;
-    }
 
-    header h1 {
-        font-size: 1.5rem;
-    }
+/* --------------------------------------------------------------------------
+   9. UTILIDADES DE ESTADO (loading, error, empty)
+   -------------------------------------------------------------------------- */
+
+/* Mensaje de estado genérico */
+.status-msg {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-align: center;
+  border-left: 3px solid;
+}
+
+.status-msg--info    { background: rgba(99,179,237,0.08);  border-color: var(--clr-accent-1); color: var(--clr-accent-1); }
+.status-msg--success { background: rgba(72,187,120,0.08);  border-color: #48bb78; color: #68d391; }
+.status-msg--error   { background: rgba(252,129,129,0.08); border-color: var(--clr-accent-3); color: var(--clr-accent-3); }
+
+/* Spinner inline accesible */
+.loading-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: var(--space-2);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+/* --------------------------------------------------------------------------
+   10. ANIMACIONES DE ENTRADA
+   -------------------------------------------------------------------------- */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Preferencia de movimiento reducido — accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   11. SCROLLBAR PERSONALIZADA (Chromium / WebKit)
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--clr-bg); }
+::-webkit-scrollbar-thumb {
+  background: var(--clr-border);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--clr-accent-1); }
+
+
+/* --------------------------------------------------------------------------
+   12. SELECCIÓN DE TEXTO
+   -------------------------------------------------------------------------- */
+::selection {
+  background: rgba(99, 179, 237, 0.30);
+  color: var(--clr-text-hi);
+}
+
+
+/* --------------------------------------------------------------------------
+   13. MEJORAS ESPECÍFICAS PARA MÓVIL
+   -------------------------------------------------------------------------- */
+
+/* Hint de cámara/galería: oculto en escritorio, visible en móvil */
+.mobile-hint {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .mobile-hint {
+    display: block;
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: rgba(99, 179, 237, 0.06);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-xs);
+    color: var(--clr-text-mid);
+    line-height: 1.5;
+  }
+
+  /* Área de toque más cómoda para el input file en móvil */
+  input[type="file"] {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  input[type="file"]::file-selector-button {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--fs-sm);
+  }
 }

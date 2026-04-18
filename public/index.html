@@ -2,46 +2,142 @@
 <html lang="es">
 
 <head>
-    <meta charset="UTF-8">
-    <title>Montaje de fotos con IA</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Herramienta de procesamiento de imágenes con IA: elimina fondos y genera montajes fotográficos usando ComfyUI y WhatsApp.">
+  <title>Montaje de Fotos con IA · BgRemove ComfyUI</title>
+
+  <!-- Tipografía moderna desde Google Fonts (display=swap para performance) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="container">
-        <header>
-            <h1>Montaje de fotos con IA</h1>
-            <p style="color: #94a3b8;">Terminal de procesamiento de imágenes</p>
-        </header>
+  <div class="container" role="main">
 
-        <form action="/procesar-imagen" method="POST" enctype="multipart/form-data">
-            <section>
-                <label>Archivo de Entrada</label>
-                <input type="file" name="foto_cliente" accept="image/*" required>
-            </section>
+    <header>
+      <h1>Montaje de Fotos con IA</h1>
+      <p>Terminal de procesamiento de imágenes</p>
+    </header>
 
-            <section>
-                <label>Identificador de Logo</label>
-                <select name="logo_empresa" required>
-                    <option value="logo.png">Logo AreaVR (Principal)</option>
-                    <option value="logo2.png">Variante Luz (Blanco)</option>
-                    <option value="logo3.png">Variante Sombra (Negro)</option>
-                </select>
-            </section>
+    <form
+      action="/procesar-imagen"
+      method="POST"
+      enctype="multipart/form-data"
+      aria-label="Formulario de generación de imagen"
+      novalidate
+    >
 
-            <section>
-                <label>Sujeto / Cliente</label>
-                <input type="text" name="nombre_cliente" placeholder="Nombre para el registro" required>
-            </section>
+      <section>
+        <label>Archivo de Entrada</label>
 
-            <section>
-                <label>Canal WhatsApp</label>
-                <input type="tel" name="telefono" placeholder="Número de contacto" required>
-            </section>
+        <!-- Selector unificado (escritorio y navegadores que no necesiten separación) -->
+        <input
+          id="foto_cliente"
+          type="file"
+          name="foto_cliente"
+          accept="image/*"
+          required
+          aria-label="Seleccionar imagen del cliente"
+        >
 
-            <button type="submit">Iniciar Secuencia de Generación</button>
-        </form>
-    </div>
-</body>
+        <!-- Hint móvil: sólo visible en pantallas pequeñas gracias al CSS -->
+        <div class="mobile-hint" id="mobile-hint" aria-hidden="true">
+          <span>&#128247; En móvil: pulsa el botón de arriba para elegir entre <strong>cámara</strong> o <strong>galería</strong></span>
+        </div>
+
+        <!-- Preview de la imagen seleccionada -->
+        <div id="img-preview-wrap" style="display:none; margin-top:var(--space-3);">
+          <img id="img-preview"
+               alt="Vista previa de la imagen seleccionada"
+               style="max-height:180px; border-radius:var(--radius-md);
+                      border:1px solid var(--clr-border); object-fit:contain;">
+          <p id="img-preview-name" style="font-size:var(--fs-xs); color:var(--clr-text-mid); margin-top:var(--space-1);"></p>
+        </div>
+      </section>
+
+      <section>
+        <label for="logo_empresa">Identificador de Logo</label>
+        <select id="logo_empresa" name="logo_empresa" required>
+          <option value="">— Selecciona un logo —</option>
+          <option value="logo.png">Logo AreaVR (Principal)</option>
+          <option value="logo2.png">Variante Luz (Blanco)</option>
+          <option value="logo3.png">Variante Sombra (Negro)</option>
+        </select>
+      </section>
+
+      <section>
+        <label for="nombre_cliente">Sujeto / Cliente</label>
+        <input
+          id="nombre_cliente"
+          type="text"
+          name="nombre_cliente"
+          placeholder="Nombre para el registro"
+          required
+          autocomplete="name"
+        >
+      </section>
+
+      <section>
+        <label for="telefono">Canal WhatsApp</label>
+        <input
+          id="telefono"
+          type="tel"
+          name="telefono"
+          placeholder="+34 600 000 000"
+          required
+          autocomplete="tel"
+        >
+      </section>
+
+      <button type="submit" id="btn-generar">
+        Iniciar Secuencia de Generación
+      </button>
+
+    </form>
+  </div>
+
+  <script>
+    // ---- Preview de imagen ----
+    const input   = document.getElementById('foto_cliente');
+    const wrap    = document.getElementById('img-preview-wrap');
+    const preview = document.getElementById('img-preview');
+    const nameEl  = document.getElementById('img-preview-name');
+
+    input.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) { wrap.style.display = 'none'; return; }
+
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP, HEIC…)');
+        this.value = '';
+        wrap.style.display = 'none';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        nameEl.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+        wrap.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // ---- Estado de carga en el botón al enviar ----
+    // Evita doble envío y da feedback visual mientras ComfyUI genera la imagen.
+    const form = document.querySelector('form');
+    const btn  = document.getElementById('btn-generar');
+
+    form.addEventListener('submit', function (e) {
+      // Validación nativa antes de bloquear el botón
+      if (!form.checkValidity()) return;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-spinner"></span> Procesando imagen…';
+    });
+  </script>
 
 </html>

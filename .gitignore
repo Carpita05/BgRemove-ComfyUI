@@ -1,4 +1,9 @@
 node_modules/
 .wwebjs_auth/
+.wwebjs_cache/
 uploads/
+outputs/
 .DS_Store
+
+# Variables de entorno — NUNCA subir al repositorio
+.env
