@@ -45,29 +45,27 @@ select {
    -------------------------------------------------------------------------- */
 :root {
   /* --- Paleta de color --- */
-  --clr-bg:          #080514;          /* Fondo página: azul muy oscuro/morado  */
-  --clr-surface:     #120c24;          /* Superficie de tarjetas                */
-  --clr-surface-alt: #1a1136;          /* Inputs, fondos elevados               */
-  --clr-border:      #2d1d4d;          /* Bordes sutiles morados                */
-  --clr-border-glow: rgba(159, 122, 234, 0.35); /* Glow de foco                 */
+  --clr-bg:          #030712;          /* Fondo página: deep tech blue/black    */
+  --clr-surface:     #0f172a;          /* Superficie de tarjetas                */
+  --clr-surface-alt: #1e293b;          /* Inputs, fondos elevados               */
+  --clr-border:      #334155;          /* Bordes sutiles azulados               */
+  --clr-border-glow: rgba(56, 189, 248, 0.35); /* Glow de foco cyan             */
 
-  --clr-accent-1:    #9f7aea;          /* Morado — principal                    */
-  --clr-accent-2:    #e53e3e;          /* Rojo — acciones destructivas / secund */
-  --clr-accent-3:    #2b6cb0;          /* Azul oscuro — acento adicional        */
+  --clr-accent-1:    #38bdf8;          /* Azul cyan tech — principal            */
+  --clr-accent-2:    #ef4444;          /* Rojo láser — secundario               */
+  --clr-accent-3:    #1d4ed8;          /* Azul profundo — acento adicional      */
 
-  --clr-text-hi:     #f7fafc;          /* Texto de alto contraste               */
-  --clr-text-mid:    #a0aec0;          /* Texto secundario / etiquetas          */
-  --clr-text-lo:     #4a5568;          /* Texto deshabilitado / placeholders    */
+  --clr-text-hi:     #f8fafc;          /* Texto de alto contraste               */
+  --clr-text-mid:    #94a3b8;          /* Texto secundario / etiquetas          */
+  --clr-text-lo:     #475569;          /* Texto deshabilitado / placeholders    */
 
   /* --- Gradientes reutilizables --- */
-  --gradient-bg:     radial-gradient(ellipse at 20% 0%, #150d2e 0%, #080514 70%);
-  --gradient-accent: linear-gradient(135deg, var(--clr-accent-1), var(--clr-accent-2));
-  --gradient-title:  linear-gradient(90deg, var(--clr-accent-3), var(--clr-accent-1), var(--clr-accent-2));
+  --gradient-bg:     radial-gradient(ellipse at top left, #0f172a 0%, #030712 50%, #2a0808 100%);
 
   /* --- Tipografía fluida ---
      Sintaxis clamp(min, preferido, max)
      "preferido" usa unidades de viewport para la interpolación suave.       */
-  --font-family:     'Inter', system-ui, -apple-system, sans-serif;
+  --font-family:     'Rajdhani', system-ui, -apple-system, sans-serif;
   --font-mono:       'Cascadia Code', 'Fira Code', 'Consolas', monospace;
 
   --fs-xs:    clamp(0.70rem, 0.65rem + 0.25vw, 0.78rem);
@@ -96,8 +94,8 @@ select {
   /* --- Sombras --- */
   --shadow-sm:  0 1px  4px rgba(0,0,0,0.40);
   --shadow-md:  0 4px 16px rgba(0,0,0,0.50);
-  --shadow-glow-blue:   0 0 18px rgba(159, 122, 234, 0.25);
-  --shadow-glow-violet: 0 0 18px rgba(229, 62, 62, 0.30);
+  --shadow-glow-blue:   0 0 18px rgba(56, 189, 248, 0.25);
+  --shadow-glow-violet: 0 0 18px rgba(239, 68, 68, 0.30);
 
   /* --- Transiciones globales --- */
   --transition-fast:   150ms ease;
@@ -135,7 +133,7 @@ body {
   max-width: 640px;         /* Ancho óptimo de lectura para formularios */
 
   /* Estilo Sólido Optimizado: Fondo opaco simple, mejor rendimiento 3D/Batería */
-  background: #120c24; /* Color base opaco sin transparencias costosas */
+  background: #0f172a; /* Color base opaco sin transparencias costosas */
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -180,7 +178,7 @@ header::before {
   height: 3px;
   margin-bottom: var(--space-3);
   border-radius: var(--radius-pill);
-  background: var(--gradient-accent);
+  background: var(--clr-accent-1);
 }
 
 header h1 {
@@ -188,12 +186,7 @@ header h1 {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
-
-  /* Texto con gradiente — técnica CSS pura */
-  background: var(--gradient-title);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--clr-accent-1);
 }
 
 header p {
@@ -262,7 +255,7 @@ textarea:focus {
 
 /* Select: icono de flecha personalizado */
 select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239f7aea' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2338bdf8' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-4) center;
   padding-right: var(--space-6);
@@ -314,7 +307,7 @@ button[type="submit"],
   text-transform: uppercase;
   color: #fff;
 
-  background: var(--gradient-accent);
+  background: var(--clr-accent-1);
   box-shadow: var(--shadow-glow-blue);
 
   /* Transición compuesta: transform + sombra = sensación premium */
@@ -327,7 +320,7 @@ button[type="submit"],
 button[type="submit"]:hover,
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 32px rgba(159, 122, 234, 0.45), 0 0 60px rgba(229, 62, 62, 0.20);
+  box-shadow: 0 0 32px rgba(56, 189, 248, 0.45), 0 0 60px rgba(239, 68, 68, 0.20);
   filter: brightness(1.08);
 }
 
@@ -361,7 +354,7 @@ button:disabled {
   height: 100%;
   width: 0%;
   border-radius: var(--radius-pill);
-  background: var(--gradient-accent);
+  background: var(--clr-accent-1);
   animation: progress 8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
@@ -385,7 +378,7 @@ form ~ img {
 .result-img:hover,
 form ~ img:hover {
   transform: scale(1.01);
-  box-shadow: var(--shadow-md), 0 0 28px rgba(159, 122, 234, 0.35);
+  box-shadow: var(--shadow-md), 0 0 28px rgba(56, 189, 248, 0.35);
 }
 
 
@@ -403,7 +396,7 @@ form ~ img:hover {
   border-left: 3px solid;
 }
 
-.status-msg--info    { background: rgba(159,122,234,0.08); border-color: var(--clr-accent-1); color: var(--clr-accent-1); }
+.status-msg--info    { background: rgba(56,189,248,0.08); border-color: var(--clr-accent-1); color: var(--clr-accent-1); }
 .status-msg--success { background: rgba(72,187,120,0.08);  border-color: #48bb78; color: #68d391; }
 .status-msg--error   { background: rgba(229,62,62,0.08);   border-color: var(--clr-accent-2); color: var(--clr-accent-2); }
 
@@ -467,7 +460,7 @@ form ~ img:hover {
    12. SELECCIÓN DE TEXTO
    -------------------------------------------------------------------------- */
 ::selection {
-  background: rgba(159, 122, 234, 0.30);
+  background: rgba(56, 189, 248, 0.30);
   color: var(--clr-text-hi);
 }
 
@@ -486,7 +479,7 @@ form ~ img:hover {
     display: block;
     margin-top: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: rgba(159, 122, 234, 0.06);
+    background: rgba(56, 189, 248, 0.06);
     border: 1px solid var(--clr-border);
     border-radius: var(--radius-sm);
     font-size: var(--fs-xs);
