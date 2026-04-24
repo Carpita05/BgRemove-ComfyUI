@@ -10,7 +10,7 @@
   },
   "3": {
     "inputs": {
-      "image": "fondo (1).jpg"
+      "image": "fondo.jpg"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -65,7 +65,7 @@
   "15": {
     "inputs": {
       "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 3.04,
+      "resize_type.multiplier": 6,
       "scale_method": "bilinear",
       "input": [
         "25",
@@ -79,7 +79,7 @@
   },
   "16": {
     "inputs": {
-      "x": 0,
+      "x": 1024,
       "y": 20,
       "resize_source": false,
       "destination": [
@@ -103,7 +103,7 @@
   "17": {
     "inputs": {
       "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 0.16,
+      "resize_type.multiplier": 1.4,
       "scale_method": "area",
       "input": [
         "24",
@@ -118,7 +118,7 @@
   "18": {
     "inputs": {
       "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 3.04,
+      "resize_type.multiplier": 6,
       "scale_method": "bilinear",
       "input": [
         "25",
@@ -133,7 +133,7 @@
   "19": {
     "inputs": {
       "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 0.16,
+      "resize_type.multiplier": 1.4,
       "scale_method": "area",
       "input": [
         "24",
@@ -149,7 +149,7 @@
     "inputs": {
       "model": "INSPYRENET",
       "sensitivity": 1,
-      "process_res": 1024,
+      "process_res": 2048,
       "mask_blur": 0,
       "mask_offset": 0,
       "invert_output": false,
@@ -170,7 +170,7 @@
     "inputs": {
       "model": "BEN2",
       "sensitivity": 1,
-      "process_res": 1024,
+      "process_res": 2048,
       "mask_blur": 0,
       "mask_offset": 0,
       "invert_output": false,

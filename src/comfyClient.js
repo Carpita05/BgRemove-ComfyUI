@@ -156,7 +156,7 @@ async function downloadImage(comfyFilename) {
  * @returns {Promise<{width: number, height: number}>}
  */
 async function getBackgroundDimensions() {
-  const BG_FILENAME = config.COMFY_BG_FILENAME ?? 'fondo (1).jpg';
+  const BG_FILENAME = config.COMFY_BG_FILENAME ?? 'fondo.jpg';
   try {
     const { data } = await axios.get(`${config.COMFY_URL}/view`, {
       params: { filename: BG_FILENAME, type: 'input' },
@@ -170,6 +170,59 @@ async function getBackgroundDimensions() {
     console.warn('[comfyClient] Usando dimensiones de fallback: 1920x1080');
     return { width: 1920, height: 1080 };
   }
+}
+
+/**
+ * Preprocesa el logo: recorta los bordes transparentes/negros con sharp.trim(),
+ * lo sube a ComfyUI como temporal y devuelve el nombre asignado y las dimensiones reales.
+ *
+ * @param {string} logoName - Nombre del logo en la carpeta input/ de ComfyUI.
+ * @returns {Promise<{uploadedName: string, width: number, height: number}>}
+ */
+async function prepareAndUploadLogo(logoName) {
+  // 1. Intentar obtener el logo desde ComfyUI; si falla, leer localmente desde ./images/
+  let logoBuffer;
+  try {
+    const { data } = await axios.get(`${config.COMFY_URL}/view`, {
+      params: { filename: logoName, type: 'input' },
+      responseType: 'arraybuffer',
+    });
+    logoBuffer = Buffer.from(data);
+    console.info(`[comfyClient] Logo descargado desde ComfyUI: ${logoName}`);
+  } catch {
+    const localLogoPath = path.join(__dirname, '..', 'images', logoName);
+    logoBuffer = fs.readFileSync(localLogoPath);
+    console.info(`[comfyClient] Logo leído localmente: ${localLogoPath}`);
+  }
+
+  // 2. Recortar bordes negros/transparentes para obtener las dimensiones reales del contenido.
+  //    threshold: tolerancia de color que se considera "borde vacío" (0-255).
+  //    Lo hacemos sobre PNG para preservar la transparencia alfa del logo.
+  const trimmedBuffer = await sharp(logoBuffer)
+    .trim({ background: '#000000', threshold: 30 })
+    .png()
+    .toBuffer();
+
+  const trimmedMeta = await sharp(trimmedBuffer).metadata();
+  console.info(
+    `[comfyClient] Logo recortado: ${trimmedMeta.width}x${trimmedMeta.height}px ` +
+    `(original antes del trim puede tener bordes negros)
+`
+  );
+
+  // 3. Escribir el buffer recortado a un temporal y subirlo a ComfyUI
+  const tmpLogoPath = path.join(OUTPUTS_DIR, `logo_trim_${Date.now()}.png`);
+  ensureOutputsDir();
+  fs.writeFileSync(tmpLogoPath, trimmedBuffer);
+
+  const uploadedLogoName = await uploadImage(tmpLogoPath, `logo_trim_${Date.now()}.png`);
+  console.info(`[comfyClient] Logo (recortado) subido a ComfyUI como: ${uploadedLogoName}`);
+
+  return {
+    uploadedName: uploadedLogoName,
+    width: trimmedMeta.width,
+    height: trimmedMeta.height,
+  };
 }
 
 /**
@@ -224,37 +277,70 @@ async function preprocessImage(inputPath, targetWidth, targetHeight) {
  * @param {string} params.filePath     - Ruta absoluta del temporal de multer.
  * @param {string} params.originalName - Nombre original del archivo subido.
  * @param {string} params.logoName     - Nombre del logo a inyectar.
+ * @param {string} params.clientName   - Nombre del cliente para el texto "¡FELICIDADES!".
  * @returns {Promise<{localPath: string, outputFilename: string}>}
  */
-async function processImage({ filePath, originalName, logoName }) {
+async function processImage({ filePath, originalName, logoName, clientName }) {
   const workflowPath = path.join(__dirname, '..', 'workflow.json');
   const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 
-  // ── PASO 1: Obtener dimensiones del fondo ─────────────────────────────────
+  // ── PASO 1: Obtener dimensiones del fondo ────────────────────────────────
   const bg = await getBackgroundDimensions();
 
-  // ── PASO 2: Calcular tamaño objetivo de la persona ────────────────────────
-  // PERSON_SCALE (0.1–1.0): fracción que la persona puede ocupar del fondo (máximo).
-  // Se aplica la escala a ambas dimensiones para asegurarse de que NUNCA sea 
-  // más ancha que el fondo en fotos horizontales.
-  const personScale = parseFloat(config.PERSON_SCALE ?? '0.70');
-  const targetWidth = Math.round(bg.width * personScale);
+  // ── PASO 1.5: Preparar el logo: recortar bordes negros + subir a ComfyUI ──
+  // El logo.png tiene bordes negros grandes que hacen que el cálculo de posición
+  // y escala sea incorrecto. Hacemos trim ANTES de calcular cualquier dimensión.
+  const logo = await prepareAndUploadLogo(logoName);
+
+  // ── PASO 2: Reservar espacio para el logo arriba + calcular tamaño persona ─
+  // El logo tendrá como máximo el 55% del ancho del fondo,
+  // y no más del 18% del alto (sin contar márgenes).
+  const LOGO_TARGET_WIDTH_RATIO = 0.55;
+  const LOGO_MAX_HEIGHT_RATIO = 0.18;
+  const LOGO_MARGIN_TOP = Math.max(15, Math.round(bg.height * 0.025));
+  const LOGO_MARGIN_BOTTOM = Math.max(10, Math.round(bg.height * 0.015));
+
+  let logoMultiplier = (bg.width * LOGO_TARGET_WIDTH_RATIO) / logo.width;
+  if ((logo.height * logoMultiplier) > (bg.height * LOGO_MAX_HEIGHT_RATIO)) {
+    logoMultiplier = (bg.height * LOGO_MAX_HEIGHT_RATIO) / logo.height;
+  }
+
+  const finalLogoWidth = Math.round(logo.width * logoMultiplier);
+  const finalLogoHeight = Math.round(logo.height * logoMultiplier);
+  const logoX = Math.round((bg.width - finalLogoWidth) / 2);
+  const logoY = LOGO_MARGIN_TOP;
+
+  // Espacio vertical total reservado para el logo (desde arriba)
+  const logoReservedHeight = logoY + finalLogoHeight + LOGO_MARGIN_BOTTOM;
+
+  console.info(
+    `[comfyClient] Logo → escala=${logoMultiplier.toFixed(3)}, ` +
+    `tamaño=${finalLogoWidth}x${finalLogoHeight}px | x=${logoX}, y=${logoY} | ` +
+    `espacio reservado arriba: ${logoReservedHeight}px`
+  );
+
+  // ── PASO 2.5: Calcular tamaño objetivo de la persona ──────────────────────
+  // PERSON_SCALE: fracción del fondo que pueden ocupar. Como las fotos originales
+  // pueden tener mucho "cielo" que luego se recorta, permitimos que crezcan bastante.
+  const personScale = parseFloat(config.PERSON_SCALE ?? '1.0');
+  const targetWidth  = Math.round(bg.width * personScale);
   const targetHeight = Math.round(bg.height * personScale);
 
   // ── PASO 3: Preprocesar → corregir EXIF + escalar de forma segura ─────────
   const processed = await preprocessImage(filePath, targetWidth, targetHeight);
 
-  // ── PASO 4: Centrar en X e Y (Totalmente centralizado) ────────────────────
-  // ComfyUI (ImageCompositeMasked) devuelve error HTTP 400 si `x` o `y` son negativos.
-  // Usamos Math.max(0, ...) para garantizar que nunca baje de 0.
-  // Si la imagen es más grande que el fondo (ej. escala 1.2), se anclará a la 
-  // esquina (0,0) superior izquierda, recortando el sobrante derecho y debajoo.
+  // ── PASO 4: Centrar persona en X; anclarla abajo en Y ────────────────────
+  // ComfyUI devuelve error HTTP 400 si `x` o `y` son negativos.
+  // Como la foto original tiene fondo que luego se elimina, el sujeto suele estar abajo.
+  // Al anclar la foto completa a la parte inferior del fondo, las cabezas subirán.
   const centerX = Math.max(0, Math.round((bg.width - processed.width) / 2));
-  const centerY = Math.max(0, Math.round((bg.height - processed.height) / 2));
+  // Pega la foto a la parte inferior (dejando que el cielo vacío esté arriba), 
+  // pero nunca con coordenadas negativas.
+  const personY = Math.max(0, bg.height - processed.height);
 
   console.info(
     `[comfyClient] Composición → persona ${processed.width}x${processed.height}px ` +
-    `en fondo ${bg.width}x${bg.height}px | x=${centerX}, y=${centerY}`
+    `en fondo ${bg.width}x${bg.height}px | x=${centerX}, y=${personY}`
   );
 
   // ── PASO 5: Subir la imagen procesada a ComfyUI ───────────────────────────
@@ -266,25 +352,103 @@ async function processImage({ filePath, originalName, logoName }) {
     if (err) console.warn('[comfyClient] No se pudo limpiar el temporal original:', err.message);
   });
 
-  // ── PASO 6: Inyectar en el workflow ──────────────────────────────────────
+  // ── PASO 6: Inyectar en el workflow ───────────────────────────────────────
   workflow['1'].inputs.image = uploadedName;
-  workflow['3'].inputs.image = config.COMFY_BG_FILENAME ?? 'fondo (1).jpg';
-  workflow[config.COMFY_NODE_LOGO_ID].inputs.image = logoName;
+  workflow['3'].inputs.image = config.COMFY_BG_FILENAME ?? 'fondo.jpg';
+  // Usar el logo ya recortado y subido (sin bordes negros)
+  workflow[config.COMFY_NODE_LOGO_ID].inputs.image = logo.uploadedName;
 
-  // La imagen ya llega pre-escalada a su tamaño óptimo final → multiplicador a 1.0 (tamaño original)
+  // La imagen del usuario ya llega pre-escalada → multiplicador a 1.0
   workflow['15'].inputs['resize_type.multiplier'] = 1.0;
   workflow['18'].inputs['resize_type.multiplier'] = 1.0;
 
-  // Actualizar las coordenadas al centro exacto
+  // Posición de la persona (centro horizontal, debajo del logo)
   workflow['7'].inputs.x = centerX;
-  workflow['7'].inputs.y = centerY;
+  workflow['7'].inputs.y = personY;
+
+  // ── PASO 6.5: Escalar y posicionar el logo (ya recortado) ─────────────────
+  workflow['17'].inputs['resize_type.multiplier'] = Number(logoMultiplier.toFixed(3));
+  workflow['19'].inputs['resize_type.multiplier'] = Number(logoMultiplier.toFixed(3));
+  workflow['16'].inputs.x = logoX;
+  workflow['16'].inputs.y = logoY;
 
   // ── PASO 7: Encolar → esperar → descargar ────────────────────────────────
   const promptId = await queuePrompt(workflow);
   const comfyFilename = await waitForResult(promptId);
   const localPath = await downloadImage(comfyFilename);
 
-  return { localPath, outputFilename: path.basename(localPath) };
+  // ── PASO 8: Superponer texto ¡FELICIDADES! al final de la imagen ──────────
+  const finalPath = await addTextOverlay(localPath, clientName);
+
+  return { localPath: finalPath, outputFilename: path.basename(finalPath) };
+}
+
+/**
+ * Añade el texto "¡FELICIDADES {nombre}!" en la parte inferior de la imagen de salida.
+ * Usa SVG + sharp.composite para renderizar sin dependencias externas de fuentes.
+ * El tamaño de fuente se calcula de forma adaptativa para que SIEMPRE quepa en el ancho.
+ *
+ * @param {string} imagePath  - Ruta absoluta de la imagen descargada.
+ * @param {string} clientName - Nombre del cliente.
+ * @returns {Promise<string>} - Ruta de la imagen con el texto incrustado.
+ */
+async function addTextOverlay(imagePath, clientName) {
+  const meta = await sharp(imagePath).metadata();
+  const imgWidth = meta.width;
+  const imgHeight = meta.height;
+
+  const text = `¡FELICIDADES ${(clientName ?? '').toUpperCase()}!`;
+
+  // Zona inferior reservada para el texto: 12% del alto, mínimo 80px
+  const bannerHeight = Math.max(80, Math.round(imgHeight * 0.12));
+
+  // Calcular font-size adaptativo:
+  // Aproximación: cada carácter ocupa ~0.55x el font-size en ancho.
+  // Dejamos un margen lateral de 5% a cada lado (90% del ancho disponible).
+  const maxTextWidth = imgWidth * 0.90;
+  const charsEstimate = text.length;
+  let fontSize = Math.floor(maxTextWidth / (charsEstimate * 0.55));
+  fontSize = Math.min(fontSize, Math.round(bannerHeight * 0.60)); // nunca mayor que la banda
+  fontSize = Math.max(fontSize, 20); // mínimo legible
+
+  // Posición del texto: centro de la banda inferior
+  const textY = imgHeight - bannerHeight + Math.round(bannerHeight * 0.68);
+
+  const svgOverlay = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${imgWidth}" height="${imgHeight}">
+      <!-- Sombra del texto -->
+      <text
+        x="${Math.round(imgWidth / 2) + 3}" y="${textY + 3}"
+        font-family="Arial Black, Arial, sans-serif"
+        font-size="${fontSize}"
+        font-weight="900"
+        text-anchor="middle"
+        fill="rgba(0,0,0,0.6)"
+      >${text}</text>
+      <!-- Texto principal: blanco con borde rojo -->
+      <text
+        x="${Math.round(imgWidth / 2)}" y="${textY}"
+        font-family="Arial Black, Arial, sans-serif"
+        font-size="${fontSize}"
+        font-weight="900"
+        text-anchor="middle"
+        fill="#FFFFFF"
+        stroke="#CC0000"
+        stroke-width="${Math.max(1, Math.round(fontSize * 0.04))}"
+        paint-order="stroke fill"
+      >${text}</text>
+    </svg>
+  `;
+
+  // Sobreescribir con la imagen + overlay (sharp no puede leer y escribir el mismo archivo)
+  const outputPath = imagePath.replace(/\.(png|jpg|jpeg)$/i, '_final.jpg');
+  await sharp(imagePath)
+    .composite([{ input: Buffer.from(svgOverlay), top: 0, left: 0 }])
+    .jpeg({ quality: 92 })
+    .toFile(outputPath);
+
+  console.info(`[comfyClient] ✅ Texto superpuesto → ${outputPath}`);
+  return outputPath;
 }
 
 module.exports = { processImage };

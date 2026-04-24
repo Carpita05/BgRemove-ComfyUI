@@ -39,6 +39,7 @@ router.post('/procesar-imagen', upload.single('foto_cliente'), async (req, res) 
       filePath:     req.file.path,
       originalName: req.file.originalname,
       logoName:     logo_empresa,
+      clientName:   nombre_cliente,
     });
 
     const outputUrl = `/outputs/${outputFilename}`;
