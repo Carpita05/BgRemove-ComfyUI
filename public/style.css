@@ -45,24 +45,24 @@ select {
    -------------------------------------------------------------------------- */
 :root {
   /* --- Paleta de color --- */
-  --clr-bg:          #080e1c;          /* Fondo página: azul noche profundo     */
-  --clr-surface:     #0f1d35;          /* Superficie de tarjetas                */
-  --clr-surface-alt: #162340;          /* Inputs, fondos elevados               */
-  --clr-border:      #1e3252;          /* Bordes sutiles                        */
-  --clr-border-glow: rgba(99, 179, 237, 0.35); /* Glow de foco                 */
+  --clr-bg:          #080514;          /* Fondo página: azul muy oscuro/morado  */
+  --clr-surface:     #120c24;          /* Superficie de tarjetas                */
+  --clr-surface-alt: #1a1136;          /* Inputs, fondos elevados               */
+  --clr-border:      #2d1d4d;          /* Bordes sutiles morados                */
+  --clr-border-glow: rgba(159, 122, 234, 0.35); /* Glow de foco                 */
 
-  --clr-accent-1:    #63b3ed;          /* Azul cielo — principal                */
-  --clr-accent-2:    #b794f4;          /* Violeta — secundario                  */
-  --clr-accent-3:    #fc8181;          /* Coral — acciones destructivas         */
+  --clr-accent-1:    #9f7aea;          /* Morado — principal                    */
+  --clr-accent-2:    #e53e3e;          /* Rojo — acciones destructivas / secund */
+  --clr-accent-3:    #2b6cb0;          /* Azul oscuro — acento adicional        */
 
-  --clr-text-hi:     #f0f4ff;          /* Texto de alto contraste               */
-  --clr-text-mid:    #94a3b8;          /* Texto secundario / etiquetas          */
+  --clr-text-hi:     #f7fafc;          /* Texto de alto contraste               */
+  --clr-text-mid:    #a0aec0;          /* Texto secundario / etiquetas          */
   --clr-text-lo:     #4a5568;          /* Texto deshabilitado / placeholders    */
 
   /* --- Gradientes reutilizables --- */
-  --gradient-bg:     radial-gradient(ellipse at 20% 0%, #0c1a3a 0%, #080e1c 70%);
+  --gradient-bg:     radial-gradient(ellipse at 20% 0%, #150d2e 0%, #080514 70%);
   --gradient-accent: linear-gradient(135deg, var(--clr-accent-1), var(--clr-accent-2));
-  --gradient-title:  linear-gradient(90deg, var(--clr-accent-1), var(--clr-accent-2), var(--clr-accent-3));
+  --gradient-title:  linear-gradient(90deg, var(--clr-accent-3), var(--clr-accent-1), var(--clr-accent-2));
 
   /* --- Tipografía fluida ---
      Sintaxis clamp(min, preferido, max)
@@ -96,8 +96,8 @@ select {
   /* --- Sombras --- */
   --shadow-sm:  0 1px  4px rgba(0,0,0,0.40);
   --shadow-md:  0 4px 16px rgba(0,0,0,0.50);
-  --shadow-glow-blue:   0 0 18px rgba(99, 179, 237, 0.25);
-  --shadow-glow-violet: 0 0 18px rgba(183, 148, 244, 0.30);
+  --shadow-glow-blue:   0 0 18px rgba(159, 122, 234, 0.25);
+  --shadow-glow-violet: 0 0 18px rgba(229, 62, 62, 0.30);
 
   /* --- Transiciones globales --- */
   --transition-fast:   150ms ease;
@@ -135,7 +135,7 @@ body {
   max-width: 640px;         /* Ancho óptimo de lectura para formularios */
 
   /* Estilo Sólido Optimizado: Fondo opaco simple, mejor rendimiento 3D/Batería */
-  background: #0f1d35; /* Color base opaco sin transparencias costosas */
+  background: #120c24; /* Color base opaco sin transparencias costosas */
   border: 1px solid var(--clr-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -262,7 +262,7 @@ textarea:focus {
 
 /* Select: icono de flecha personalizado */
 select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2363b3ed' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239f7aea' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-4) center;
   padding-right: var(--space-6);
@@ -327,7 +327,7 @@ button[type="submit"],
 button[type="submit"]:hover,
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 32px rgba(99, 179, 237, 0.45), 0 0 60px rgba(183, 148, 244, 0.20);
+  box-shadow: 0 0 32px rgba(159, 122, 234, 0.45), 0 0 60px rgba(229, 62, 62, 0.20);
   filter: brightness(1.08);
 }
 
@@ -385,7 +385,7 @@ form ~ img {
 .result-img:hover,
 form ~ img:hover {
   transform: scale(1.01);
-  box-shadow: var(--shadow-md), 0 0 28px rgba(99, 179, 237, 0.35);
+  box-shadow: var(--shadow-md), 0 0 28px rgba(159, 122, 234, 0.35);
 }
 
 
@@ -403,9 +403,9 @@ form ~ img:hover {
   border-left: 3px solid;
 }
 
-.status-msg--info    { background: rgba(99,179,237,0.08);  border-color: var(--clr-accent-1); color: var(--clr-accent-1); }
+.status-msg--info    { background: rgba(159,122,234,0.08); border-color: var(--clr-accent-1); color: var(--clr-accent-1); }
 .status-msg--success { background: rgba(72,187,120,0.08);  border-color: #48bb78; color: #68d391; }
-.status-msg--error   { background: rgba(252,129,129,0.08); border-color: var(--clr-accent-3); color: var(--clr-accent-3); }
+.status-msg--error   { background: rgba(229,62,62,0.08);   border-color: var(--clr-accent-2); color: var(--clr-accent-2); }
 
 /* Spinner inline accesible */
 .loading-spinner {
@@ -467,7 +467,7 @@ form ~ img:hover {
    12. SELECCIÓN DE TEXTO
    -------------------------------------------------------------------------- */
 ::selection {
-  background: rgba(99, 179, 237, 0.30);
+  background: rgba(159, 122, 234, 0.30);
   color: var(--clr-text-hi);
 }
 
@@ -486,7 +486,7 @@ form ~ img:hover {
     display: block;
     margin-top: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: rgba(99, 179, 237, 0.06);
+    background: rgba(159, 122, 234, 0.06);
     border: 1px solid var(--clr-border);
     border-radius: var(--radius-sm);
     font-size: var(--fs-xs);
