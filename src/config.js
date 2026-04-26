@@ -30,7 +30,7 @@ module.exports = {
   COMFY_BG_FILENAME: process.env.COMFY_BG_FILENAME ?? 'fondo.jpg',
   // Fracción del fondo que ocupa la persona (0.1 – 1.0, o > 1.0 si quieres que desborde)
   // PERSON_SCALE permite a las personas crecer más para llenar la pantalla
-  PERSON_SCALE: process.env.PERSON_SCALE ?? '0.94',
+  PERSON_SCALE: process.env.PERSON_SCALE ?? '1.15',
   GOOGLE_REVIEW_URL: process.env.GOOGLE_REVIEW_URL ?? 'https://g.page/r/CWAYKlgUL2eKEAE/review',
   PHONE_PREFIX: process.env.PHONE_PREFIX ?? '34',
 };

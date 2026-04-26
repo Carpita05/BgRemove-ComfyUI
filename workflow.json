@@ -1,7 +1,7 @@
 {
   "1": {
     "inputs": {
-      "image": "personas (1).jpg"
+      "image": "WhatsApp Image 2026-04-26 at 10.33.19.jpeg"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -55,7 +55,7 @@
   },
   "13": {
     "inputs": {
-      "image": "AreaVResLogo-768x563.png"
+      "image": "logo.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -68,7 +68,7 @@
       "resize_type.multiplier": 6,
       "scale_method": "bilinear",
       "input": [
-        "25",
+        "26",
         0
       ]
     },
@@ -121,7 +121,7 @@
       "resize_type.multiplier": 6,
       "scale_method": "bilinear",
       "input": [
-        "25",
+        "26",
         1
       ]
     },
@@ -166,25 +166,31 @@
       "title": "Remove Background (RMBG)"
     }
   },
-  "25": {
+  "26": {
     "inputs": {
-      "model": "BEN2",
-      "sensitivity": 1,
-      "process_res": 2048,
-      "mask_blur": 0,
-      "mask_offset": 0,
-      "invert_output": false,
-      "refine_foreground": false,
-      "background": "Alpha",
-      "background_color": "#222222",
-      "image": [
+      "model": [
+        "27",
+        0
+      ],
+      "images": [
         "1",
         0
       ]
     },
-    "class_type": "RMBG",
+    "class_type": "RembgByBiRefNet",
     "_meta": {
-      "title": "Remove Background (RMBG)"
+      "title": "RembgByBiRefNet"
+    }
+  },
+  "27": {
+    "inputs": {
+      "model_name": "General",
+      "device": "AUTO",
+      "dtype": "float32"
+    },
+    "class_type": "AutoDownloadBiRefNetModel",
+    "_meta": {
+      "title": "AutoDownloadBiRefNetModel"
     }
   }
 }

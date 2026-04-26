@@ -293,10 +293,10 @@ async function processImage({ filePath, originalName, logoName, clientName }) {
   const logo = await prepareAndUploadLogo(logoName);
 
   // ── PASO 2: Reservar espacio para el logo arriba + calcular tamaño persona ─
-  // El logo tendrá como máximo el 55% del ancho del fondo,
-  // y no más del 18% del alto (sin contar márgenes).
-  const LOGO_TARGET_WIDTH_RATIO = 0.55;
-  const LOGO_MAX_HEIGHT_RATIO = 0.18;
+  // El logo tendrá como máximo el 80% del ancho del fondo,
+  // y no más del 26% del alto (sin contar márgenes).
+  const LOGO_TARGET_WIDTH_RATIO = 0.80;
+  const LOGO_MAX_HEIGHT_RATIO = 0.26;
   const LOGO_MARGIN_TOP = Math.max(15, Math.round(bg.height * 0.025));
   const LOGO_MARGIN_BOTTOM = Math.max(10, Math.round(bg.height * 0.015));
 
@@ -322,25 +322,60 @@ async function processImage({ filePath, originalName, logoName, clientName }) {
   // ── PASO 2.5: Calcular tamaño objetivo de la persona ──────────────────────
   // PERSON_SCALE: fracción del fondo que pueden ocupar. Como las fotos originales
   // pueden tener mucho "cielo" que luego se recorta, permitimos que crezcan bastante.
-  const personScale = parseFloat(config.PERSON_SCALE ?? '1.0');
+  // Persona más grande (escala 1.15 = 15% más que el alto del fondo)
+  const personScale = parseFloat(config.PERSON_SCALE ?? '1.15');
   const targetWidth  = Math.round(bg.width * personScale);
   const targetHeight = Math.round(bg.height * personScale);
 
   // ── PASO 3: Preprocesar → corregir EXIF + escalar de forma segura ─────────
   const processed = await preprocessImage(filePath, targetWidth, targetHeight);
 
-  // ── PASO 4: Centrar persona en X; anclarla abajo en Y ────────────────────
+  // ── PASO 4: Centrar persona en X y en la zona ENTRE el logo y el texto ──────
   // ComfyUI devuelve error HTTP 400 si `x` o `y` son negativos.
-  // Como la foto original tiene fondo que luego se elimina, el sujeto suele estar abajo.
-  // Al anclar la foto completa a la parte inferior del fondo, las cabezas subirán.
   const centerX = Math.max(0, Math.round((bg.width - processed.width) / 2));
-  // Pega la foto a la parte inferior (dejando que el cielo vacío esté arriba), 
-  // pero nunca con coordenadas negativas.
-  const personY = Math.max(0, bg.height - processed.height);
+
+  // La banda inferior del texto ocupa el 12% del alto del fondo (igual que en addTextOverlay).
+  const bannerHeight = Math.max(80, Math.round(bg.height * 0.12));
+
+  // Zona donde debe vivir la persona: entre el borde inferior del logo y el borde superior del texto.
+  const personZoneTop    = logoReservedHeight;
+  const personZoneBottom = bg.height - bannerHeight;
+  
+  // El punto medio matemático a veces deja las caras muy bajas. 
+  // Sesgamos el centro hacia arriba un 10% del alto total del fondo para que queden más altas.
+  const centerBias = Math.round(bg.height * 0.10);
+  const personZoneCenter = Math.round((personZoneTop + personZoneBottom) / 2) - centerBias;
+
+  let personY = personZoneCenter - Math.round(processed.height / 2);
+
+  // Si la persona debería estar más arriba del borde superior (y negativo), ComfyUI fallará (Error 400).
+  // Para solucionarlo y permitir que suban más, recortamos (crop) la parte de la foto que quedaría fuera.
+  if (personY < 0) {
+    const cropTop = Math.abs(personY);
+    console.info(`[comfyClient] 'y' negativa detectada (${personY}). Recortando ${cropTop}px de la parte superior de la imagen.`);
+    
+    const croppedPath = `${processed.path}_cropped.jpg`;
+    await sharp(processed.path)
+      .extract({ 
+        left: 0, 
+        top: cropTop, 
+        width: processed.width, 
+        height: processed.height - cropTop 
+      })
+      .toFile(croppedPath);
+      
+    // Actualizamos las referencias a la imagen recortada
+    processed.path = croppedPath;
+    processed.height = processed.height - cropTop;
+    personY = 0; // Ahora empieza desde el borde exacto
+  }
 
   console.info(
+    `[comfyClient] Zona persona: ${personZoneTop}–${personZoneBottom}px (centro sesgado=${personZoneCenter}px)`
+  );
+  console.info(
     `[comfyClient] Composición → persona ${processed.width}x${processed.height}px ` +
-    `en fondo ${bg.width}x${bg.height}px | x=${centerX}, y=${personY}`
+    `en fondo ${bg.width}x${bg.height}px | x=${centerX}, y=${personY} (centrada y ajustada)`
   );
 
   // ── PASO 5: Subir la imagen procesada a ComfyUI ───────────────────────────
@@ -403,11 +438,11 @@ async function addTextOverlay(imagePath, clientName) {
   const bannerHeight = Math.max(80, Math.round(imgHeight * 0.12));
 
   // Calcular font-size adaptativo:
-  // Aproximación: cada carácter ocupa ~0.55x el font-size en ancho.
-  // Dejamos un margen lateral de 5% a cada lado (90% del ancho disponible).
-  const maxTextWidth = imgWidth * 0.90;
+  // Aproximación: la fuente Arial Black es muy ancha, cada carácter ocupa ~0.75x el font-size en ancho.
+  // Dejamos un margen lateral (80% del ancho disponible máximo).
+  const maxTextWidth = imgWidth * 0.80;
   const charsEstimate = text.length;
-  let fontSize = Math.floor(maxTextWidth / (charsEstimate * 0.55));
+  let fontSize = Math.floor(maxTextWidth / (charsEstimate * 0.75));
   fontSize = Math.min(fontSize, Math.round(bannerHeight * 0.60)); // nunca mayor que la banda
   fontSize = Math.max(fontSize, 20); // mínimo legible
 
@@ -416,16 +451,13 @@ async function addTextOverlay(imagePath, clientName) {
 
   const svgOverlay = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${imgWidth}" height="${imgHeight}">
-      <!-- Sombra del texto -->
-      <text
-        x="${Math.round(imgWidth / 2) + 3}" y="${textY + 3}"
-        font-family="Arial Black, Arial, sans-serif"
-        font-size="${fontSize}"
-        font-weight="900"
-        text-anchor="middle"
-        fill="rgba(0,0,0,0.6)"
-      >${text}</text>
-      <!-- Texto principal: blanco con borde rojo -->
+      <defs>
+        <filter id="drop-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="3" dy="6" stdDeviation="5" flood-color="#000000" flood-opacity="1.0"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#000000" flood-opacity="0.7"/>
+        </filter>
+      </defs>
+      <!-- Texto principal con sombreado -->
       <text
         x="${Math.round(imgWidth / 2)}" y="${textY}"
         font-family="Arial Black, Arial, sans-serif"
@@ -436,6 +468,7 @@ async function addTextOverlay(imagePath, clientName) {
         stroke="#CC0000"
         stroke-width="${Math.max(1, Math.round(fontSize * 0.04))}"
         paint-order="stroke fill"
+        filter="url(#drop-shadow)"
       >${text}</text>
     </svg>
   `;
