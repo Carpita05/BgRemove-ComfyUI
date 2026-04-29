@@ -1,11 +1,11 @@
 {
   "1": {
     "inputs": {
-      "image": "WhatsApp Image 2026-04-26 at 10.33.19.jpeg"
+      "image": "Personas.jpeg"
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Load Image"
+      "title": "Load Image (Personas)"
     }
   },
   "3": {
@@ -14,43 +14,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Load Image"
-    }
-  },
-  "5": {
-    "inputs": {
-      "filename_prefix": "Resultado",
-      "images": [
-        "16",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
-  "7": {
-    "inputs": {
-      "x": 115,
-      "y": 0,
-      "resize_source": false,
-      "destination": [
-        "3",
-        0
-      ],
-      "source": [
-        "15",
-        0
-      ],
-      "mask": [
-        "18",
-        0
-      ]
-    },
-    "class_type": "ImageCompositeMasked",
-    "_meta": {
-      "title": "ImageCompositeMasked"
+      "title": "Load Image (Fondo)"
     }
   },
   "13": {
@@ -59,96 +23,13 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Load Image"
-    }
-  },
-  "15": {
-    "inputs": {
-      "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 6,
-      "scale_method": "bilinear",
-      "input": [
-        "26",
-        0
-      ]
-    },
-    "class_type": "ResizeImageMaskNode",
-    "_meta": {
-      "title": "Resize Image/Mask"
-    }
-  },
-  "16": {
-    "inputs": {
-      "x": 1024,
-      "y": 20,
-      "resize_source": false,
-      "destination": [
-        "7",
-        0
-      ],
-      "source": [
-        "17",
-        0
-      ],
-      "mask": [
-        "19",
-        0
-      ]
-    },
-    "class_type": "ImageCompositeMasked",
-    "_meta": {
-      "title": "ImageCompositeMasked"
-    }
-  },
-  "17": {
-    "inputs": {
-      "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 1.4,
-      "scale_method": "area",
-      "input": [
-        "24",
-        0
-      ]
-    },
-    "class_type": "ResizeImageMaskNode",
-    "_meta": {
-      "title": "Resize Image/Mask"
-    }
-  },
-  "18": {
-    "inputs": {
-      "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 6,
-      "scale_method": "bilinear",
-      "input": [
-        "26",
-        1
-      ]
-    },
-    "class_type": "ResizeImageMaskNode",
-    "_meta": {
-      "title": "Resize Image/Mask"
-    }
-  },
-  "19": {
-    "inputs": {
-      "resize_type": "scale by multiplier",
-      "resize_type.multiplier": 1.4,
-      "scale_method": "area",
-      "input": [
-        "24",
-        1
-      ]
-    },
-    "class_type": "ResizeImageMaskNode",
-    "_meta": {
-      "title": "Resize Image/Mask"
+      "title": "Load Image (Logo)"
     }
   },
   "24": {
     "inputs": {
       "model": "INSPYRENET",
-      "sensitivity": 1,
+      "sensitivity": 1.0,
       "process_res": 2048,
       "mask_blur": 0,
       "mask_offset": 0,
@@ -163,7 +44,7 @@
     },
     "class_type": "RMBG",
     "_meta": {
-      "title": "Remove Background (RMBG)"
+      "title": "Remove Background (Logo)"
     }
   },
   "26": {
@@ -179,7 +60,7 @@
     },
     "class_type": "RembgByBiRefNet",
     "_meta": {
-      "title": "RembgByBiRefNet"
+      "title": "RembgByBiRefNet (Personas)"
     }
   },
   "27": {
@@ -188,9 +69,263 @@
       "device": "AUTO",
       "dtype": "float32"
     },
-    "class_type": "AutoDownloadBiRefNetModel",
+    "class_type": "AutoDownloadBiRefNetModel"
+  },
+  "100": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": 2048,
+      "height": 1536,
+      "crop": "center",
+      "image": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
     "_meta": {
-      "title": "AutoDownloadBiRefNetModel"
+      "title": "Fijar Fondo 4:3 (2048x1536)"
+    }
+  },
+  "101": {
+    "inputs": {
+      "image": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "GetImageSize+",
+    "_meta": {
+      "title": "Get Logo Size"
+    }
+  },
+  "103": {
+    "inputs": {
+      "expression": "b * 1638 // a",
+      "a": [
+        "101",
+        0
+      ],
+      "b": [
+        "101",
+        1
+      ]
+    },
+    "class_type": "MathExpression|pysssss",
+    "_meta": {
+      "title": "Calc Alto del Logo"
+    }
+  },
+  "104": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": 1638,
+      "height": [
+        "103",
+        0
+      ],
+      "crop": "disabled",
+      "image": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Escalar Imagen Logo"
+    }
+  },
+  "106": {
+    "inputs": {
+      "mask": [
+        "24",
+        1
+      ]
+    },
+    "class_type": "MaskToImage"
+  },
+  "105": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": 1638,
+      "height": [
+        "103",
+        0
+      ],
+      "crop": "disabled",
+      "image": [
+        "106",
+        0
+      ]
+    },
+    "class_type": "ImageScale"
+  },
+  "107": {
+    "inputs": {
+      "channel": "red",
+      "image": [
+        "105",
+        0
+      ]
+    },
+    "class_type": "ImageToMask"
+  },
+  "110": {
+    "inputs": {
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "GetImageSize+",
+    "_meta": {
+      "title": "Get People Size"
+    }
+  },
+  "111": {
+    "inputs": {
+      "expression": "a * 1480 // b",
+      "a": [
+        "110",
+        0
+      ],
+      "b": [
+        "110",
+        1
+      ]
+    },
+    "class_type": "MathExpression|pysssss",
+    "_meta": {
+      "title": "Calc Ancho Personas"
+    }
+  },
+  "112": {
+    "inputs": {
+      "expression": "(2048 - a) // 2",
+      "a": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "MathExpression|pysssss",
+    "_meta": {
+      "title": "Calc X Centro Personas"
+    }
+  },
+  "113": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": [
+        "111",
+        0
+      ],
+      "height": 1480,
+      "crop": "disabled",
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Escalar Imagen Personas"
+    }
+  },
+  "114": {
+    "inputs": {
+      "mask": [
+        "26",
+        1
+      ]
+    },
+    "class_type": "MaskToImage"
+  },
+  "115": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": [
+        "111",
+        0
+      ],
+      "height": 1480,
+      "crop": "disabled",
+      "image": [
+        "114",
+        0
+      ]
+    },
+    "class_type": "ImageScale"
+  },
+  "116": {
+    "inputs": {
+      "channel": "red",
+      "image": [
+        "115",
+        0
+      ]
+    },
+    "class_type": "ImageToMask"
+  },
+  "120": {
+    "inputs": {
+      "x": 205,
+      "y": 30,
+      "resize_source": false,
+      "destination": [
+        "100",
+        0
+      ],
+      "source": [
+        "104",
+        0
+      ],
+      "mask": [
+        "107",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "Pegar Logo al Fondo (Capa 1)"
+    }
+  },
+  "121": {
+    "inputs": {
+      "x": [
+        "112",
+        0
+      ],
+      "y": 0,
+      "resize_source": false,
+      "destination": [
+        "120",
+        0
+      ],
+      "source": [
+        "113",
+        0
+      ],
+      "mask": [
+        "116",
+        0
+      ]
+    },
+    "class_type": "ImageCompositeMasked",
+    "_meta": {
+      "title": "Pegar Personas (Capa 2)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "filename_prefix": "Resultado",
+      "images": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Resultado Final"
     }
   }
 }

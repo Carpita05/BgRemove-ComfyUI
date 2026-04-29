@@ -269,9 +269,35 @@ async function preprocessImage(inputPath, targetWidth, targetHeight) {
 }
 
 /**
+ * Inyecta de forma segura un valor en un nodo del workflow.
+ * Si el nodo o la clave no existen, registra un aviso en lugar de lanzar un error.
+ *
+ * @param {object} workflow - Objeto del workflow cargado desde JSON.
+ * @param {string} nodeId   - ID del nodo (clave en el objeto).
+ * @param {string} key      - Propiedad dentro de `inputs` a sobreescribir.
+ * @param {*}      value    - Valor a asignar.
+ */
+function injectSafe(workflow, nodeId, key, value) {
+  if (!workflow[nodeId]) {
+    console.warn(`[comfyClient] ⚠️  Nodo "${nodeId}" no encontrado en el workflow – se omite la inyección de "${key}".`);
+    return;
+  }
+  if (!workflow[nodeId].inputs) {
+    console.warn(`[comfyClient] ⚠️  El nodo "${nodeId}" no tiene campo "inputs" – se omite la inyección de "${key}".`);
+    return;
+  }
+  workflow[nodeId].inputs[key] = value;
+}
+
+/**
  * Orquesta el flujo completo: preprocesar → upload → encolar → esperar → descargar.
- * Calcula automáticamente el tamaño y la posición centrada de la persona
- * en función de las dimensiones reales del fondo.
+ *
+ * El nuevo workflow delega TODO el escalado y posicionado a ComfyUI mediante
+ * nodos MathExpression + ImageScale + ImageCompositeMasked, por lo que este
+ * cliente sólo necesita:
+ *   1. Inyectar los nombres de archivo en los nodos LoadImage.
+ *   2. (Opcional) Sobreescribir las coordenadas x/y de composición del logo
+ *      si el nodo existe en el workflow (compatibilidad hacia adelante).
  *
  * @param {object} params
  * @param {string} params.filePath     - Ruta absoluta del temporal de multer.
@@ -282,137 +308,74 @@ async function preprocessImage(inputPath, targetWidth, targetHeight) {
  */
 async function processImage({ filePath, originalName, logoName, clientName }) {
   const workflowPath = path.join(__dirname, '..', 'workflow.json');
-  const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+  let workflow;
+  try {
+    workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`[comfyClient] No se pudo leer o parsear workflow.json: ${err.message}`);
+  }
 
-  // ── PASO 1: Obtener dimensiones del fondo ────────────────────────────────
-  const bg = await getBackgroundDimensions();
+  // ── PASO 1: Preprocesar la imagen del cliente (corregir EXIF + normalizar) ─
+  // Limitamos la resolución de subida a 2048px para no sobrecargar ComfyUI;
+  // el workflow escala internamente con sus nodos ImageScale.
+  const MAX_UPLOAD_PX = 2048;
+  const processed = await preprocessImage(filePath, MAX_UPLOAD_PX, MAX_UPLOAD_PX);
 
-  // ── PASO 1.5: Preparar el logo: recortar bordes negros + subir a ComfyUI ──
-  // El logo.png tiene bordes negros grandes que hacen que el cálculo de posición
-  // y escala sea incorrecto. Hacemos trim ANTES de calcular cualquier dimensión.
+  // ── PASO 2: Subir la imagen procesada a ComfyUI ───────────────────────────
+  const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const uploadedName = await uploadImage(processed.path, `${Date.now()}_${safeOriginalName}`);
+  console.info(`[comfyClient] Foto subida a ComfyUI como: ${uploadedName}`);
+
+  // Liberar el temporal original de multer
+  fs.unlink(filePath, (err) => {
+    if (err) console.warn('[comfyClient] No se pudo limpiar el temporal original:', err.message);
+  });
+
+  // ── PASO 3: Preparar el logo: trim + subir ────────────────────────────────
   const logo = await prepareAndUploadLogo(logoName);
 
-  // ── PASO 2: Reservar espacio para el logo arriba + calcular tamaño persona ─
-  // El logo tendrá como máximo el 80% del ancho del fondo,
-  // y no más del 26% del alto (sin contar márgenes).
+  // ── PASO 4: Inyectar imágenes en los nodos LoadImage ─────────────────────
+  // Nodo 1 → foto de la persona
+  injectSafe(workflow, '1', 'image', uploadedName);
+  // Nodo 3 → imagen de fondo
+  injectSafe(workflow, '3', 'image', config.COMFY_BG_FILENAME ?? 'fondo.jpg');
+  // Nodo logo (por defecto '13', configurable en .env)
+  injectSafe(workflow, config.COMFY_NODE_LOGO_ID, 'image', logo.uploadedName);
+
+  // ── PASO 5 (Opcional): sobreescribir posición del logo en nodo '120' ──────
+  // El workflow puede calcular estas coordenadas internamente con MathExpression;
+  // sólo sobreescribimos si se desea afinar desde el servidor (nodo opcional).
+  // Si los nodos no existen, injectSafe emite un aviso y continúa sin error.
+  const bg = await getBackgroundDimensions();
   const LOGO_TARGET_WIDTH_RATIO = 0.80;
-  const LOGO_MAX_HEIGHT_RATIO = 0.26;
-  const LOGO_MARGIN_TOP = Math.max(15, Math.round(bg.height * 0.025));
-  const LOGO_MARGIN_BOTTOM = Math.max(10, Math.round(bg.height * 0.015));
+  const LOGO_MAX_HEIGHT_RATIO   = 0.26;
+  const LOGO_MARGIN_TOP         = Math.max(15, Math.round(bg.height * 0.025));
 
   let logoMultiplier = (bg.width * LOGO_TARGET_WIDTH_RATIO) / logo.width;
   if ((logo.height * logoMultiplier) > (bg.height * LOGO_MAX_HEIGHT_RATIO)) {
     logoMultiplier = (bg.height * LOGO_MAX_HEIGHT_RATIO) / logo.height;
   }
-
   const finalLogoWidth = Math.round(logo.width * logoMultiplier);
-  const finalLogoHeight = Math.round(logo.height * logoMultiplier);
-  const logoX = Math.round((bg.width - finalLogoWidth) / 2);
+  const logoX = Math.max(0, Math.round((bg.width - finalLogoWidth) / 2));
   const logoY = LOGO_MARGIN_TOP;
-
-  // Espacio vertical total reservado para el logo (desde arriba)
-  const logoReservedHeight = logoY + finalLogoHeight + LOGO_MARGIN_BOTTOM;
 
   console.info(
     `[comfyClient] Logo → escala=${logoMultiplier.toFixed(3)}, ` +
-    `tamaño=${finalLogoWidth}x${finalLogoHeight}px | x=${logoX}, y=${logoY} | ` +
-    `espacio reservado arriba: ${logoReservedHeight}px`
+    `tamaño=${finalLogoWidth}x${Math.round(logo.height * logoMultiplier)}px | x=${logoX}, y=${logoY}`
   );
 
-  // ── PASO 2.5: Calcular tamaño objetivo de la persona ──────────────────────
-  // PERSON_SCALE: fracción del fondo que pueden ocupar. Como las fotos originales
-  // pueden tener mucho "cielo" que luego se recorta, permitimos que crezcan bastante.
-  // Persona más grande (escala 1.15 = 15% más que el alto del fondo)
-  const personScale = parseFloat(config.PERSON_SCALE ?? '1.15');
-  const targetWidth  = Math.round(bg.width * personScale);
-  const targetHeight = Math.round(bg.height * personScale);
+  // Composición del logo (nodo 120 en el nuevo workflow)
+  injectSafe(workflow, '120', 'x', logoX);
+  injectSafe(workflow, '120', 'y', logoY);
 
-  // ── PASO 3: Preprocesar → corregir EXIF + escalar de forma segura ─────────
-  const processed = await preprocessImage(filePath, targetWidth, targetHeight);
-
-  // ── PASO 4: Centrar persona en X y en la zona ENTRE el logo y el texto ──────
-  // ComfyUI devuelve error HTTP 400 si `x` o `y` son negativos.
-  const centerX = Math.max(0, Math.round((bg.width - processed.width) / 2));
-
-  // La banda inferior del texto ocupa el 12% del alto del fondo (igual que en addTextOverlay).
-  const bannerHeight = Math.max(80, Math.round(bg.height * 0.12));
-
-  // Zona donde debe vivir la persona: entre el borde inferior del logo y el borde superior del texto.
-  const personZoneTop    = logoReservedHeight;
-  const personZoneBottom = bg.height - bannerHeight;
-  
-  // El punto medio matemático a veces deja las caras muy bajas. 
-  // Sesgamos el centro hacia arriba un 10% del alto total del fondo para que queden más altas.
-  const centerBias = Math.round(bg.height * 0.10);
-  const personZoneCenter = Math.round((personZoneTop + personZoneBottom) / 2) - centerBias;
-
-  let personY = personZoneCenter - Math.round(processed.height / 2);
-
-  // Si la persona debería estar más arriba del borde superior (y negativo), ComfyUI fallará (Error 400).
-  // Para solucionarlo y permitir que suban más, recortamos (crop) la parte de la foto que quedaría fuera.
-  if (personY < 0) {
-    const cropTop = Math.abs(personY);
-    console.info(`[comfyClient] 'y' negativa detectada (${personY}). Recortando ${cropTop}px de la parte superior de la imagen.`);
-    
-    const croppedPath = `${processed.path}_cropped.jpg`;
-    await sharp(processed.path)
-      .extract({ 
-        left: 0, 
-        top: cropTop, 
-        width: processed.width, 
-        height: processed.height - cropTop 
-      })
-      .toFile(croppedPath);
-      
-    // Actualizamos las referencias a la imagen recortada
-    processed.path = croppedPath;
-    processed.height = processed.height - cropTop;
-    personY = 0; // Ahora empieza desde el borde exacto
-  }
-
-  console.info(
-    `[comfyClient] Zona persona: ${personZoneTop}–${personZoneBottom}px (centro sesgado=${personZoneCenter}px)`
-  );
-  console.info(
-    `[comfyClient] Composición → persona ${processed.width}x${processed.height}px ` +
-    `en fondo ${bg.width}x${bg.height}px | x=${centerX}, y=${personY} (centrada y ajustada)`
-  );
-
-  // ── PASO 5: Subir la imagen procesada a ComfyUI ───────────────────────────
-  const safeOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const uploadedName = await uploadImage(processed.path, `${Date.now()}_${safeOriginalName}`);
-
-  // Limpiar el temporal original de multer
-  fs.unlink(filePath, (err) => {
-    if (err) console.warn('[comfyClient] No se pudo limpiar el temporal original:', err.message);
-  });
-
-  // ── PASO 6: Inyectar en el workflow ───────────────────────────────────────
-  workflow['1'].inputs.image = uploadedName;
-  workflow['3'].inputs.image = config.COMFY_BG_FILENAME ?? 'fondo.jpg';
-  // Usar el logo ya recortado y subido (sin bordes negros)
-  workflow[config.COMFY_NODE_LOGO_ID].inputs.image = logo.uploadedName;
-
-  // La imagen del usuario ya llega pre-escalada → multiplicador a 1.0
-  workflow['15'].inputs['resize_type.multiplier'] = 1.0;
-  workflow['18'].inputs['resize_type.multiplier'] = 1.0;
-
-  // Posición de la persona (centro horizontal, debajo del logo)
-  workflow['7'].inputs.x = centerX;
-  workflow['7'].inputs.y = personY;
-
-  // ── PASO 6.5: Escalar y posicionar el logo (ya recortado) ─────────────────
-  workflow['17'].inputs['resize_type.multiplier'] = Number(logoMultiplier.toFixed(3));
-  workflow['19'].inputs['resize_type.multiplier'] = Number(logoMultiplier.toFixed(3));
-  workflow['16'].inputs.x = logoX;
-  workflow['16'].inputs.y = logoY;
-
-  // ── PASO 7: Encolar → esperar → descargar ────────────────────────────────
+  // ── PASO 6: Encolar → esperar → descargar ────────────────────────────────
   const promptId = await queuePrompt(workflow);
+  console.info(`[comfyClient] Workflow encolado con promptId: ${promptId}`);
+
   const comfyFilename = await waitForResult(promptId);
   const localPath = await downloadImage(comfyFilename);
 
-  // ── PASO 8: Superponer texto ¡FELICIDADES! al final de la imagen ──────────
+  // ── PASO 7: Superponer texto ¡FELICIDADES! ───────────────────────────────
   const finalPath = await addTextOverlay(localPath, clientName);
 
   return { localPath: finalPath, outputFilename: path.basename(finalPath) };
