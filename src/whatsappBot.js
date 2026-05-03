@@ -2,47 +2,20 @@
 
 /**
  * @file whatsappBot.js
- * Gestiona el cliente de whatsapp-web.js.
+ * Adaptador para enviar mensajes multimedia a través de Evolution API.
+ *
  * Responsabilidades:
- *   - Inicializar y autenticar la sesión (LocalAuth persiste el QR).
- *   - Exponer sendImageToContact() para que las rutas puedan enviar imágenes.
- *   - Normalizar números de teléfono al formato internacional.
+ *   - Exponer sendImageToContact() que hace una petición HTTP POST a Evolution API.
+ *   - Normalizar números de teléfono al formato internacional antes de enviarlos.
+ *
+ * Nota: La autenticación de la sesión de WhatsApp (QR, Baileys, etc.) es
+ * gestionada íntegramente por el servidor Evolution API externo.
+ * Este módulo solo actúa como cliente HTTP de dicho servidor.
  */
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const fs     = require('fs');
+const path   = require('path');
 const config = require('./config');
-
-// ---------------------------------------------------------------------------
-// Inicialización del cliente
-// ---------------------------------------------------------------------------
-
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  },
-});
-
-client.on('qr', (qr) => {
-  console.info('\n[WhatsApp] Escanea el QR con tu móvil para vincular la sesión:\n');
-  qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', () => {
-  console.info('[WhatsApp] ✅ Cliente conectado y listo para enviar mensajes.');
-});
-
-client.on('auth_failure', (msg) => {
-  console.error('[WhatsApp] ❌ Fallo de autenticación:', msg);
-});
-
-client.on('disconnected', (reason) => {
-  console.warn('[WhatsApp] ⚠️  Cliente desconectado. Razón:', reason);
-});
-
-client.initialize();
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -53,7 +26,7 @@ client.initialize();
  * Si el número tiene exactamente 9 dígitos, se antepone el PHONE_PREFIX del .env.
  *
  * @param {string} rawPhone - Número tal como lo introduce el usuario.
- * @returns {string}        - Número solo con dígitos, listo para WhatsApp.
+ * @returns {string}        - Número solo con dígitos, listo para la API.
  *
  * @example
  * formatPhoneNumber('600 123 456')  // → '34600123456'  (ES)
@@ -71,29 +44,86 @@ function formatPhoneNumber(rawPhone) {
 // ---------------------------------------------------------------------------
 
 /**
- * Envía una imagen local a un contacto de WhatsApp.
+ * Envía una imagen local a un contacto de WhatsApp a través de Evolution API.
  *
- * @param {string} rawPhone      - Número de teléfono (con o sin prefijo de país).
+ * La imagen se lee desde el disco, se codifica en Base64 y se envía como
+ * payload JSON al endpoint POST /message/sendMedia/{instanceName} de Evolution API.
+ *
+ * @param {string} rawPhone       - Número de teléfono (con o sin prefijo de país).
  * @param {string} localImagePath - Ruta absoluta de la imagen en el disco del servidor.
- * @param {string} caption       - Texto que acompaña a la imagen.
+ * @param {string} caption        - Texto que acompaña a la imagen (pie de foto).
  * @returns {Promise<void>}
- * @throws {Error} Si el número no está en WhatsApp o el cliente no está listo.
+ * @throws {Error} Si la petición a Evolution API falla o devuelve un error HTTP.
  */
 async function sendImageToContact(rawPhone, localImagePath, caption) {
-  const phone    = formatPhoneNumber(rawPhone);
-  const numberId = await client.getNumberId(phone);
+  const phone = formatPhoneNumber(rawPhone);
 
-  if (!numberId) {
-    throw new Error(
-      `El número "${phone}" no está registrado en WhatsApp. ` +
-      'Verifica que el prefijo del país sea correcto (PHONE_PREFIX en .env).'
-    );
+  // Leer la imagen del disco y convertirla a Base64
+  const imageBuffer  = fs.readFileSync(localImagePath);
+  const base64Image  = imageBuffer.toString('base64');
+  const mimeType     = _getMimeType(localImagePath);
+
+  // Construir la URL del endpoint de Evolution API
+  const url = `${config.EVOLUTION_BASE_URL}/message/sendMedia/${config.EVOLUTION_INSTANCE_NAME}`;
+
+  // Cuerpo de la petición según la spec de Evolution API v2
+  const body = {
+    number:  `${phone}@s.whatsapp.net`,
+    mediatype: 'image',
+    mimetype: mimeType,
+    caption:  caption ?? '',
+    media:    base64Image,
+    fileName: path.basename(localImagePath),
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey':        config.EVOLUTION_API_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+
+    // Si la respuesta no es 2xx, lanzamos un error con el detalle del servidor
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Evolution API respondió con ${response.status} ${response.statusText}: ${errorText}`
+      );
+    }
+
+    console.info(`[WhatsApp] ✅ Imagen enviada correctamente a ${phone} vía Evolution API.`);
+
+  } catch (err) {
+    // Capturamos tanto errores de red (servidor caído) como errores HTTP (4xx/5xx)
+    console.error('[WhatsApp] ❌ Error al enviar imagen via Evolution API:', err.message);
+    throw err; // Re-lanzamos para que la ruta pueda devolver un 500 al cliente
   }
+}
 
-  const media = MessageMedia.fromFilePath(localImagePath);
-  await client.sendMessage(numberId._serialized, media, { caption });
+// ---------------------------------------------------------------------------
+// Helpers privados
+// ---------------------------------------------------------------------------
 
-  console.info(`[WhatsApp] ✅ Imagen enviada correctamente a ${phone}`);
+/**
+ * Devuelve el MIME type correcto en función de la extensión del archivo.
+ * Evolution API requiere este campo para procesar correctamente el adjunto.
+ *
+ * @param {string} filePath - Ruta o nombre de archivo.
+ * @returns {string}        - MIME type (por defecto 'image/jpeg').
+ */
+function _getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeMap = {
+    '.jpg':  'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png':  'image/png',
+    '.gif':  'image/gif',
+    '.webp': 'image/webp',
+  };
+  return mimeMap[ext] ?? 'image/jpeg';
 }
 
 module.exports = { sendImageToContact, formatPhoneNumber };

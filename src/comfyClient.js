@@ -99,18 +99,51 @@ async function waitForResult(promptId, timeoutMs = 120_000) {
       );
     }
 
-    if (entry.status?.completed) {
+    // IMPORTANTE: status.completed puede ponerse a true antes de que los outputs
+    // estén realmente escritos en el historial. Exigimos que outputs también exista
+    // y tenga contenido antes de dar el prompt por finalizado.
+    if (entry.status?.completed && entry.outputs && Object.keys(entry.outputs).length > 0) {
       const outputNodeId = config.COMFY_NODE_OUTPUT_ID;
+
+      // ── Estrategia 1: buscar en el nodo configurado (COMFY_NODE_OUTPUT_ID) ──
       const images = entry.outputs?.[outputNodeId]?.images;
 
-      if (!images || images.length === 0) {
-        throw new Error(
-          `El nodo de salida "${outputNodeId}" no produjo ninguna imagen. ` +
-          'Verifica que COMFY_NODE_OUTPUT_ID apunta al nodo SaveImage correcto.'
-        );
+      if (images && images.length > 0) {
+        console.info(`[comfyClient] ✅ Imagen encontrada en nodo "${outputNodeId}": ${images[0].filename}`);
+        return images[0].filename;
       }
 
-      return images[0].filename;
+      // ── Estrategia 2 (fallback): escanear todos los nodos de salida ──────────
+      // Cubre el caso en que el ID del nodo SaveImage cambia entre versiones del workflow.
+      console.warn(
+        `[comfyClient] ⚠️  El nodo "${outputNodeId}" no tiene imágenes. ` +
+        `Nodos con output disponibles: [${Object.keys(entry.outputs).join(', ')}]. ` +
+        'Buscando en todos los nodos de salida…'
+      );
+
+      for (const [nodeId, nodeOutput] of Object.entries(entry.outputs)) {
+        const fallbackImages = nodeOutput?.images;
+        if (fallbackImages && fallbackImages.length > 0) {
+          console.info(
+            `[comfyClient] ✅ Imagen encontrada en nodo alternativo "${nodeId}": ` +
+            `${fallbackImages[0].filename}. ` +
+            `Considera actualizar COMFY_NODE_OUTPUT_ID=${nodeId} en tu .env`
+          );
+          return fallbackImages[0].filename;
+        }
+      }
+
+      // Si llegamos aquí, completed=true y hay outputs pero ninguno tiene imágenes
+      // Esto no debería ocurrir, pero registramos el estado completo para diagnóstico
+      console.error(
+        '[comfyClient] ❌ El prompt completó pero ningún nodo tiene imágenes. ' +
+        'Estado completo de outputs:\n' + JSON.stringify(entry.outputs, null, 2)
+      );
+      throw new Error(
+        `El workflow completó pero ningún nodo de salida produjo imágenes. ` +
+        `Nodos revisados: [${Object.keys(entry.outputs).join(', ')}]. ` +
+        'Revisa que el nodo SaveImage está conectado correctamente en el workflow.'
+      );
     }
   }
 

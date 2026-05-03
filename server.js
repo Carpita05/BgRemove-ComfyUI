@@ -21,7 +21,7 @@ const path        = require('path');
 const fs          = require('fs');
 const imageRoutes = require('./src/routes/imageRoutes');
 
-// Inicializa el cliente de WhatsApp al arrancar (genera el QR en consola si es necesario).
+// Carga el módulo de WhatsApp (adaptador HTTP hacia Evolution API; sin QR ni estado local).
 require('./src/whatsappBot');
 
 // ── Directorios necesarios ───────────────────────────────────────────────────

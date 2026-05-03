@@ -13,6 +13,7 @@
 const express  = require('express');
 const multer   = require('multer');
 const path     = require('path');
+const fs       = require('fs');
 const { processImage }       = require('../comfyClient');
 const { sendImageToContact } = require('../whatsappBot');
 const config   = require('../config');
@@ -33,6 +34,14 @@ const upload = multer({
  */
 router.post('/procesar-imagen', upload.single('foto_cliente'), async (req, res) => {
   const { telefono, nombre_cliente, logo_empresa } = req.body;
+
+  // Validación server-side: no confiar únicamente en la validación del navegador
+  if (!req.file) {
+    return res.status(400).send(buildErrorPage('No se ha recibido ninguna imagen. Por favor, selecciona un archivo.'));
+  }
+  if (!telefono || !nombre_cliente || !logo_empresa) {
+    return res.status(400).send(buildErrorPage('Faltan campos obligatorios (teléfono, nombre o logo). Rellena el formulario completo.'));
+  }
 
   try {
     const { localPath, outputFilename } = await processImage({
@@ -60,7 +69,21 @@ router.post('/procesar-imagen', upload.single('foto_cliente'), async (req, res) 
  */
 router.post('/enviar-confirmacion', async (req, res) => {
   const { telefono, nombre, outputFilename } = req.body;
-  const localImagePath = path.join(__dirname, '..', '..', 'outputs', outputFilename);
+
+  // Validación server-side defensiva
+  if (!telefono || !nombre || !outputFilename) {
+    return res.status(400).send(buildErrorPage('Faltan datos de la solicitud (teléfono, nombre o archivo). Vuelve a generar la imagen.'));
+  }
+
+  // Seguridad: usar solo el basename para evitar ataques de path traversal
+  const safeFilename = path.basename(outputFilename);
+  const localImagePath = path.join(__dirname, '..', '..', 'outputs', safeFilename);
+
+  // Verificar que el archivo existe antes de intentar enviarlo
+
+  if (!fs.existsSync(localImagePath)) {
+    return res.status(404).send(buildErrorPage('El archivo de imagen no se encontró. Es posible que haya sido eliminado. Genera la imagen de nuevo.'));
+  }
 
   try {
     const caption =
