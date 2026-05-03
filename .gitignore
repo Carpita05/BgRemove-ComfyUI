@@ -7,3 +7,13 @@ outputs/
 
 # Variables de entorno — NUNCA subir al repositorio
 .env
+
+# Evolution API data (Bases de datos y sesiones de WhatsApp)
+evolution-api/evolution_instances/
+evolution-api/evolution_store/
+evolution-api/postgres_data/
+evolution-api/redis_data/
+
+# Binarios y ejecutables
+*.exe
+cloudflared.exe
