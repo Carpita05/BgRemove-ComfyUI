@@ -44,9 +44,10 @@ Aplicación web que integra **ComfyUI** con un servidor **Node.js** para automat
   - `ComfyUI-Inspyrenet-Rembg` — para eliminación de fondo (nodo RMBG).
   - `ComfyUI-Essentials` — para nodos de utilidad: redimensionado, posicionamiento y composición.
 
-### 3. WhatsApp
+### 3. Evolution API (WhatsApp)
 
-- Un número de WhatsApp activo en un móvil físico para escanear el código QR la primera vez.
+- Instancia de Evolution API v2.0 corriendo (recomendado vía Docker).
+- Un número de WhatsApp activo en un móvil físico para vincular mediante Pairing Code.
 
 ---
 
@@ -58,7 +59,7 @@ Aplicación web que integra **ComfyUI** con un servidor **Node.js** para automat
 npm install
 ```
 
-Esto instalará: `express`, `multer`, `sharp`, `whatsapp-web.js`, `axios`, `dotenv` y el resto de dependencias listadas en `package.json`.
+Esto instalará: `express`, `multer`, `sharp`, `axios`, `dotenv` y el resto de dependencias listadas en `package.json`.
 
 ### Paso 2 — Crear el archivo `.env`
 
@@ -79,16 +80,39 @@ Abre el `.env` recién creado y revisa cada variable (ver sección de referencia
    - **Alternativa:** si ComfyUI no puede acceder al logo, el servidor lo leerá automáticamente desde la carpeta local `./images/` del proyecto.
 3. Asegúrate de que el `workflow.json` del proyecto está en la **raíz** del repositorio (ya incluido).
 
-### Paso 4 — Vincular WhatsApp (solo la primera vez)
+### Paso 4 — Configuración de Evolution API (WhatsApp)
 
-```bash
-npm start
+Para que el bot funcione, necesitas vincular tu número de WhatsApp con la API. Como usamos la versión 2.0 y el "Pairing Code" (código de 8 letras), el proceso consta de dos peticiones HTTP que puedes ejecutar desde Postman, Thunder Client o cualquier terminal.
+
+> **⚠️ Importante antes de empezar:** 
+> Asegúrate de que los contenedores de Docker están encendidos (`docker compose up -d`).
+
+#### 1. Crear la Instancia
+
+Esta petición le dice a la base de datos que reserve un espacio para nuestro bot.
+
+- **Método:** `POST`
+- **URL:** `http://localhost:8080/instance/create`
+- **Headers:** 
+  - `apikey`: `<TU_API_KEY_DEL_ENV>`
+- **Body (raw / JSON):**
+```json
+{
+  "instanceName": "comfy_final",
+  "integration": "WHATSAPP-BAILEYS"
+}
 ```
 
-- Espera unos segundos. La consola mostrará un **código QR** en texto.
-- En tu móvil, abre WhatsApp → **Dispositivos vinculados → Vincular un dispositivo** → escanea el QR.
-- Cuando veas `[WhatsApp] ✅ Cliente conectado y listo para enviar mensajes.`, el setup está completo.
-- La sesión se guarda en `.wwebjs_auth/` de forma **persistente**. No tendrás que repetir este paso salvo que cierres sesión desde el móvil.
+#### 2. Obtener el Código de Vinculación (Pairing Code)
+
+Esta petición conecta con Meta y te devuelve el código de 8 caracteres que debes introducir en tu móvil (WhatsApp > Dispositivos vinculados > Vincular con número de teléfono).
+
+- **Método:** `GET`
+- **URL:** `http://localhost:8080/instance/connect/comfy_final?number=<TU_NUMERO>`
+- **Headers:**
+  - `apikey`: `<TU_API_KEY_DEL_ENV>`
+
+> **Nota:** Reemplaza `<TU_NUMERO>` por el número de tu móvil incluyendo el prefijo de tu país, pero sin el símbolo `+` (ejemplo para España: `34600123456`).
 
 ### Paso 5 — Arrancar el servidor
 
@@ -264,7 +288,7 @@ BgRemove-ComfyUI/
 ├── src/
 │   ├── config.js           # Carga y valida variables de entorno
 │   ├── comfyClient.js      # Toda la lógica de composición con IA
-│   ├── whatsappBot.js      # Cliente WhatsApp (sesión QR)
+│   ├── whatsappBot.js      # Cliente WhatsApp (Evolution API)
 │   └── routes/
 │       └── imageRoutes.js  # Rutas Express (/procesar-imagen)
 ├── images/                 # Logos en fallback local (si ComfyUI no los tiene)
@@ -312,4 +336,4 @@ El sistema corregirá la orientación EXIF, escalará la foto, la enviará a Com
 | El logo no aparece o sale mal posicionado | Bordes negros no recortados | Aumenta el `threshold` en `prepareAndUploadLogo` (valor por defecto: `30`) |
 | Error `400 Bad Request` desde ComfyUI | Asset no encontrado en `input/` de ComfyUI | Verifica que el fondo y los logos están en la carpeta `input/` de ComfyUI |
 | `Timeout: ComfyUI no completó...` | ComfyUI sin recursos o apagado | Comprueba que ComfyUI está activo y sin errores en su consola |
-| WhatsApp no envía | Sesión caducada | Elimina `.wwebjs_auth/`, reinicia el servidor y escanea el QR de nuevo |
+| WhatsApp no envía | Instancia desconectada | Verifica el estado en Evolution API o vuelve a vincular el número con el Pairing Code |
