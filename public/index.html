@@ -16,6 +16,42 @@
 </head>
 
 <body>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       OVERLAY DE CARGA — visible mientras ComfyUI procesa la imagen.
+       Se activa al enviar el formulario y desaparece cuando el
+       navegador navega a la página de resultado.
+       ═══════════════════════════════════════════════════════════════ -->
+  <div id="loading-overlay" class="loading-overlay" aria-hidden="true" role="status">
+
+    <!-- Anillo de pulso exterior -->
+    <div class="lo-ring"></div>
+
+    <!-- Icono central IA -->
+    <div class="lo-icon" aria-hidden="true">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="24" cy="24" r="22" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 4" />
+        <path d="M16 24h4l3-8 4 16 3-8h4" stroke="#38bdf8" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <!-- Título principal -->
+    <p class="lo-title">Procesando imagen<span class="lo-dots"></span></p>
+
+    <!-- Mensaje de fase — rota automáticamente cada ~3 s -->
+    <p id="lo-status" class="lo-status">Subiendo imagen al servidor…</p>
+
+    <!-- Barra de progreso simulada -->
+    <div class="lo-bar-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="lo-bar-fill" class="lo-bar-fill"></div>
+    </div>
+
+    <!-- Nota de tiempo estimado -->
+    <p class="lo-note">Este proceso puede tardar entre 30 y 90 segundos</p>
+
+  </div>
+
   <div class="container" role="main">
 
     <header>
@@ -100,42 +136,110 @@
   </div>
 
   <script>
-    // ---- Preview de imagen ----
-    const input   = document.getElementById('foto_cliente');
-    const wrap    = document.getElementById('img-preview-wrap');
-    const preview = document.getElementById('img-preview');
-    const nameEl  = document.getElementById('img-preview-name');
+    /* =========================================================
+       PREVIEW DE IMAGEN SELECCIONADA
+       ========================================================= */
+    const fileInput  = document.getElementById('foto_cliente');
+    const previewWrap = document.getElementById('img-preview-wrap');
+    const previewImg  = document.getElementById('img-preview');
+    const previewName = document.getElementById('img-preview-name');
 
-    input.addEventListener('change', function () {
+    fileInput.addEventListener('change', function () {
       const file = this.files[0];
-      if (!file) { wrap.style.display = 'none'; return; }
+      if (!file) { previewWrap.style.display = 'none'; return; }
 
       if (!file.type.startsWith('image/')) {
         alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP, HEIC…)');
         this.value = '';
-        wrap.style.display = 'none';
+        previewWrap.style.display = 'none';
         return;
       }
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        preview.src = e.target.result;
-        nameEl.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
-        wrap.style.display = 'block';
+        previewImg.src = e.target.result;
+        previewName.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+        previewWrap.style.display = 'block';
       };
       reader.readAsDataURL(file);
     });
 
-    // ---- Estado de carga en el botón al enviar ----
-    // Evita doble envío y da feedback visual mientras ComfyUI genera la imagen.
-    const form = document.querySelector('form');
-    const btn  = document.getElementById('btn-generar');
+    /* =========================================================
+       OVERLAY DE CARGA
+       Se activa en el submit y permanece hasta que el navegador
+       carga la nueva página con el resultado.
+       ========================================================= */
+    const form    = document.querySelector('form');
+    const btn     = document.getElementById('btn-generar');
+    const overlay = document.getElementById('loading-overlay');
+    const statusEl = document.getElementById('lo-status');
+    const barFill  = document.getElementById('lo-bar-fill');
 
-    form.addEventListener('submit', function (e) {
-      // Validación nativa antes de bloquear el botón
+    /**
+     * Mensajes que se muestran en secuencia para dar sensación de progreso real.
+     * Cada entrada: [texto, porcentaje aproximado de progreso]
+     */
+    const PHASES = [
+      ['Subiendo imagen al servidor…',           5],
+      ['Preparando el logo de empresa…',         12],
+      ['Enviando a ComfyUI para procesar…',      20],
+      ['Eliminando el fondo con IA…',            38],
+      ['Componiendo el montaje fotográfico…',    55],
+      ['Aplicando efectos y ajustes finales…',   70],
+      ['Descargando resultado del servidor…',    85],
+      ['Añadiendo texto personalizado…',         92],
+      ['Preparando vista previa…',               98],
+    ];
+
+    /** Avanza la barra suavemente hasta un porcentaje objetivo. */
+    function setProgress(pct) {
+      barFill.style.width = pct + '%';
+      barFill.closest('[role=progressbar]').setAttribute('aria-valuenow', pct);
+    }
+
+    /** Muestra el overlay y arranca el ciclo de mensajes + progreso. */
+    function showLoadingOverlay() {
+      overlay.classList.add('is-visible');
+      overlay.setAttribute('aria-hidden', 'false');
+
+      let phaseIdx = 0;
+
+      function advancePhase() {
+        if (phaseIdx >= PHASES.length) return;
+        const [msg, pct] = PHASES[phaseIdx++];
+        statusEl.textContent = msg;
+        setProgress(pct);
+        // El último mensaje se deja fijo; los anteriores rotan cada 4 s
+        if (phaseIdx < PHASES.length) {
+          setTimeout(advancePhase, 4000);
+        }
+      }
+
+      // Pequeño delay inicial para que el primer render del overlay se vea antes
+      // de que el navegador empiece a transferir el formulario.
+      setTimeout(advancePhase, 300);
+    }
+
+    form.addEventListener('submit', function () {
+      // Solo activamos el overlay si el formulario es válido
+      // (checkValidity() ya lo gestiona el atributo required de cada campo)
       if (!form.checkValidity()) return;
+
       btn.disabled = true;
-      btn.innerHTML = '<span class="loading-spinner"></span> Procesando imagen…';
+      showLoadingOverlay();
+    });
+
+    // Seguridad: si el usuario vuelve con el botón "Atrás" del navegador,
+    // el overlay puede quedar visible sobre la página restaurada.
+    // pageshow con persisted=true indica que la página viene de la caché bfcache.
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) {
+        overlay.classList.remove('is-visible');
+        overlay.setAttribute('aria-hidden', 'true');
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Secuencia de Generación';
+        setProgress(0);
+      }
     });
   </script>
 </body>

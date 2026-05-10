@@ -10,18 +10,47 @@
  *   4. Descargar la imagen resultante y guardarla localmente en ./outputs/.
  */
 
-const axios = require('axios');
+const axios    = require('axios');
 const FormData = require('form-data');
-const fs = require('fs');
-const path = require('path');
-const sharp = require('sharp');
-const config = require('./config');
+const fs       = require('fs');
+const path     = require('path');
+const sharp    = require('sharp');
+const config   = require('./config');
 
 /** Directorio local donde se guardan las imágenes generadas. */
 const OUTPUTS_DIR = path.join(__dirname, '..', 'outputs');
 
 /** Intervalo de polling al endpoint /history de ComfyUI (ms). */
 const POLL_INTERVAL_MS = 1_500;
+
+// ---------------------------------------------------------------------------
+// Caché de módulo — se carga/resuelve una sola vez al arrancar la aplicación
+// ---------------------------------------------------------------------------
+
+/**
+ * El workflow se carga desde disco UNA sola vez al arrancar el módulo.
+ * En cada petición se hace una copia profunda (JSON parse/stringify) porque
+ * processImage muta el objeto con injectSafe().
+ * Si el archivo no se puede leer en este momento, el proceso falla antes de
+ * aceptar peticiones (fail-fast).
+ */
+const WORKFLOW_PATH = path.join(__dirname, '..', 'workflow.json');
+let _workflowBase;
+try {
+  _workflowBase = JSON.parse(fs.readFileSync(WORKFLOW_PATH, 'utf8'));
+  console.info('[comfyClient] ✅ workflow.json cargado correctamente.');
+} catch (err) {
+  console.error(`[comfyClient] ❌ No se pudo leer workflow.json: ${err.message}`);
+  process.exit(1);
+}
+
+/**
+ * Caché de las dimensiones del fondo.
+ * Se rellena en la primera petición y no vuelve a descargarse mientras el
+ * proceso esté activo (el fondo no cambia en tiempo de ejecución).
+ * @type {{ width: number, height: number } | null}
+ */
+let _bgDimensionsCache = null;
 
 // ---------------------------------------------------------------------------
 // Helpers internos
@@ -51,7 +80,7 @@ async function uploadImage(filePath, uploadedName) {
     { headers: formData.getHeaders() }
   );
 
-  // Eliminar el temporal de multer tras el upload exitoso
+  // Eliminar el temporal de multer tras el upload exitoso (no bloquea si falla)
   fs.unlink(filePath, (err) => {
     if (err) console.warn('[comfyClient] No se pudo eliminar el temporal:', err.message);
   });
@@ -74,10 +103,10 @@ async function queuePrompt(workflow) {
  * Hace polling al endpoint /history/{promptId} hasta que el job se complete.
  * Lanza un error si se supera el tiempo máximo de espera.
  *
- * @param {string} promptId        - ID del prompt a monitorizar.
+ * @param {string} promptId           - ID del prompt a monitorizar.
  * @param {number} [timeoutMs=120000] - Timeout en ms (por defecto 2 minutos).
- * @returns {Promise<string>}      - Nombre del archivo de imagen generado por ComfyUI.
- * @throws {Error}                 - Si hay timeout o ComfyUI reporta un error interno.
+ * @returns {Promise<string>}         - Nombre del archivo de imagen generado por ComfyUI.
+ * @throws {Error}                    - Si hay timeout o ComfyUI reporta un error interno.
  */
 async function waitForResult(promptId, timeoutMs = 120_000) {
   const deadline = Date.now() + timeoutMs;
@@ -172,7 +201,8 @@ async function downloadImage(comfyFilename) {
   const localFilename = `${Date.now()}_${comfyFilename}`;
   const localPath = path.join(OUTPUTS_DIR, localFilename);
 
-  fs.writeFileSync(localPath, Buffer.from(data));
+  // Escritura asíncrona para no bloquear el event loop (las imágenes pueden ser grandes)
+  await fs.promises.writeFile(localPath, Buffer.from(data));
   console.info(`[comfyClient] ✅ Imagen guardada localmente en: ${localPath}`);
 
   return localPath;
@@ -184,20 +214,26 @@ async function downloadImage(comfyFilename) {
 
 /**
  * Obtiene las dimensiones del fondo directamente desde ComfyUI via /view.
+ * El resultado se cachea en memoria: el fondo no cambia mientras el proceso
+ * está activo, por lo que no tiene sentido descargarlo en cada petición.
  * Si falla (ComfyUI apagado o fondo no encontrado), devuelve un fallback razonable.
  *
  * @returns {Promise<{width: number, height: number}>}
  */
 async function getBackgroundDimensions() {
-  const BG_FILENAME = config.COMFY_BG_FILENAME ?? 'fondo.jpg';
+  // Devolver desde caché si ya fue resuelto anteriormente
+  if (_bgDimensionsCache) return _bgDimensionsCache;
+
+  const BG_FILENAME = config.COMFY_BG_FILENAME;
   try {
     const { data } = await axios.get(`${config.COMFY_URL}/view`, {
       params: { filename: BG_FILENAME, type: 'input' },
       responseType: 'arraybuffer',
     });
     const meta = await sharp(Buffer.from(data)).metadata();
-    console.info(`[comfyClient] Fondo detectado: ${meta.width}x${meta.height}px`);
-    return { width: meta.width, height: meta.height };
+    console.info(`[comfyClient] Fondo detectado: ${meta.width}x${meta.height}px (cacheado para futuras peticiones)`);
+    _bgDimensionsCache = { width: meta.width, height: meta.height };
+    return _bgDimensionsCache;
   } catch (err) {
     console.warn(`[comfyClient] No se pudo leer el fondo "${BG_FILENAME}": ${err.message}`);
     console.warn('[comfyClient] Usando dimensiones de fallback: 1920x1080');
@@ -224,7 +260,8 @@ async function prepareAndUploadLogo(logoName) {
     console.info(`[comfyClient] Logo descargado desde ComfyUI: ${logoName}`);
   } catch {
     const localLogoPath = path.join(__dirname, '..', 'images', logoName);
-    logoBuffer = fs.readFileSync(localLogoPath);
+    // Lectura asíncrona para no bloquear el event loop
+    logoBuffer = await fs.promises.readFile(localLogoPath);
     console.info(`[comfyClient] Logo leído localmente: ${localLogoPath}`);
   }
 
@@ -239,17 +276,30 @@ async function prepareAndUploadLogo(logoName) {
   const trimmedMeta = await sharp(trimmedBuffer).metadata();
   console.info(
     `[comfyClient] Logo recortado: ${trimmedMeta.width}x${trimmedMeta.height}px ` +
-    `(original antes del trim puede tener bordes negros)
-`
+    `(original antes del trim puede tener bordes negros)`
   );
 
-  // 3. Escribir el buffer recortado a un temporal y subirlo a ComfyUI
-  const tmpLogoPath = path.join(OUTPUTS_DIR, `logo_trim_${Date.now()}.png`);
-  ensureOutputsDir();
-  fs.writeFileSync(tmpLogoPath, trimmedBuffer);
+  // 3. Escribir el buffer recortado a un temporal y subirlo a ComfyUI.
+  //    Usamos un timestamp único para evitar colisiones de nombre.
+  const timestamp   = Date.now();
+  const tmpFilename = `logo_trim_${timestamp}.png`;
+  const tmpLogoPath = path.join(OUTPUTS_DIR, tmpFilename);
 
-  const uploadedLogoName = await uploadImage(tmpLogoPath, `logo_trim_${Date.now()}.png`);
-  console.info(`[comfyClient] Logo (recortado) subido a ComfyUI como: ${uploadedLogoName}`);
+  ensureOutputsDir();
+
+  // Escritura asíncrona para no bloquear el event loop
+  await fs.promises.writeFile(tmpLogoPath, trimmedBuffer);
+
+  let uploadedLogoName;
+  try {
+    // Usamos el mismo timestamp para que el nombre en disco y en ComfyUI coincidan
+    uploadedLogoName = await uploadImage(tmpLogoPath, tmpFilename);
+    console.info(`[comfyClient] Logo (recortado) subido a ComfyUI como: ${uploadedLogoName}`);
+  } catch (err) {
+    // Limpieza del temporal si el upload falla para no dejar archivos huérfanos
+    fs.unlink(tmpLogoPath, () => {});
+    throw err;
+  }
 
   return {
     uploadedName: uploadedLogoName,
@@ -286,8 +336,7 @@ async function preprocessImage(inputPath, targetWidth, targetHeight) {
     .resize({
       width: Math.max(1, targetWidth),
       height: Math.max(1, targetHeight),
-      fit: 'inside',             // mantiene el aspect ratio sin recortar, garantizando que quepa
-      // Permitimos enlargement para que fotos pequeñas de móvil SE HAGAN más grandes si lo pides.
+      fit: 'inside', // mantiene el aspect ratio sin recortar, garantizando que quepa
     })
     .jpeg({ quality: 92, progressive: true })
     .toFile(outputPath);
@@ -340,13 +389,8 @@ function injectSafe(workflow, nodeId, key, value) {
  * @returns {Promise<{localPath: string, outputFilename: string}>}
  */
 async function processImage({ filePath, originalName, logoName, clientName }) {
-  const workflowPath = path.join(__dirname, '..', 'workflow.json');
-  let workflow;
-  try {
-    workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
-  } catch (err) {
-    throw new Error(`[comfyClient] No se pudo leer o parsear workflow.json: ${err.message}`);
-  }
+  // Copia profunda del workflow base (el original no debe mutarse nunca)
+  const workflow = JSON.parse(JSON.stringify(_workflowBase));
 
   // ── PASO 1: Preprocesar la imagen del cliente (corregir EXIF + normalizar) ─
   // Limitamos la resolución de subida a 2048px para no sobrecargar ComfyUI;
@@ -371,7 +415,7 @@ async function processImage({ filePath, originalName, logoName, clientName }) {
   // Nodo 1 → foto de la persona
   injectSafe(workflow, '1', 'image', uploadedName);
   // Nodo 3 → imagen de fondo
-  injectSafe(workflow, '3', 'image', config.COMFY_BG_FILENAME ?? 'fondo.jpg');
+  injectSafe(workflow, '3', 'image', config.COMFY_BG_FILENAME);
   // Nodo logo (por defecto '13', configurable en .env)
   injectSafe(workflow, config.COMFY_NODE_LOGO_ID, 'image', logo.uploadedName);
 
@@ -465,7 +509,7 @@ async function addTextOverlay(imagePath, clientName) {
         stroke-width="${Math.max(1, Math.round(fontSize * 0.04))}"
         paint-order="stroke fill"
         filter="url(#drop-shadow)"
-      >${text}</text>
+      >${escapeXml(text)}</text>
     </svg>
   `;
 
@@ -480,5 +524,61 @@ async function addTextOverlay(imagePath, clientName) {
   return outputPath;
 }
 
-module.exports = { processImage };
+/**
+ * Escapa caracteres especiales XML para uso seguro dentro de elementos SVG.
+ * Previene inyección de marcado en el SVG generado dinámicamente.
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
+/**
+ * Estado actual de la conexión a ComfyUI.
+ * - null: Aún no se ha comprobado
+ * - true: Conectado
+ * - false: Desconectado
+ * @type {boolean | null}
+ */
+let isComfyUIConnected = null;
+
+/**
+ * Inicia un monitor que comprueba periódicamente si ComfyUI sigue vivo.
+ * Avisa por consola si se pierde o se recupera la conexión.
+ * @param {number} intervalMs - Intervalo de comprobación en milisegundos.
+ */
+function startComfyUIMonitor(intervalMs = 10000) {
+  const ping = async () => {
+    try {
+      // El endpoint /system_stats es ligero y confirma que la API está viva
+      await axios.get(`${config.COMFY_URL}/system_stats`, { timeout: 3000 });
+      
+      // Si antes estaba desconectado o es la primera comprobación, avisamos de la conexión
+      if (isComfyUIConnected === false || isComfyUIConnected === null) {
+        console.info(`\n🔌 [ComfyUI] ✅ ESTADO: CONECTADO y listo en ${config.COMFY_URL}\n`);
+        isComfyUIConnected = true;
+      }
+    } catch (err) {
+      // Si antes estaba conectado o es la primera comprobación, avisamos de la pérdida
+      if (isComfyUIConnected === true || isComfyUIConnected === null) {
+        console.error(`\n🔌 [ComfyUI] ❌ ESTADO: DESCONECTADO (Conexión perdida con ${config.COMFY_URL})`);
+        console.error(`   Asegúrate de que ComfyUI está encendido. Reintentando en segundo plano...\n`);
+        isComfyUIConnected = false;
+      }
+    }
+  };
+
+  // Primera comprobación inmediata
+  ping();
+  
+  // Bucle de comprobación periódica
+  setInterval(ping, intervalMs);
+}
+
+module.exports = { processImage, startComfyUIMonitor };

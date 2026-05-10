@@ -20,9 +20,13 @@ const config   = require('../config');
 
 const router = express.Router();
 
-/** Multer: almacenamiento temporal en ./uploads/ (relativo a la raíz del proyecto). */
+/**
+ * Multer: almacenamiento temporal en ./uploads/ (relativo a la raíz del proyecto).
+ * Límite de 20 MB para evitar que clientes suban archivos arbitrariamente grandes.
+ */
 const upload = multer({
   dest: path.join(__dirname, '..', '..', 'uploads'),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB máximo
 });
 
 // ── POST /procesar-imagen ────────────────────────────────────────────────────
@@ -51,12 +55,16 @@ router.post('/procesar-imagen', upload.single('foto_cliente'), async (req, res) 
       clientName:   nombre_cliente,
     });
 
-    const outputUrl = `/outputs/${outputFilename}`;
-    res.send(buildResultPage({ nombre: nombre_cliente, telefono, outputUrl, outputFilename }));
+    // Construir la URL de preview de forma segura usando solo el basename
+    const safeFilename = path.basename(outputFilename);
+    const outputUrl = `/outputs/${safeFilename}`;
+
+    res.send(buildResultPage({ nombre: nombre_cliente, telefono, outputUrl, outputFilename: safeFilename }));
 
   } catch (err) {
-    console.error('[route /procesar-imagen]', err.message);
-    res.status(500).send(buildErrorPage(err.message));
+    // Log técnico completo en el servidor (con stack trace), mensaje genérico al cliente.
+    console.error('[route /procesar-imagen] Error interno:', err);
+    res.status(500).send(buildErrorPage('Error interno al procesar la imagen. Comprueba que ComfyUI está activo e inténtalo de nuevo.'));
   }
 });
 
@@ -79,9 +87,11 @@ router.post('/enviar-confirmacion', async (req, res) => {
   const safeFilename = path.basename(outputFilename);
   const localImagePath = path.join(__dirname, '..', '..', 'outputs', safeFilename);
 
-  // Verificar que el archivo existe antes de intentar enviarlo
-
-  if (!fs.existsSync(localImagePath)) {
+  // Verificar que el archivo existe antes de intentar enviarlo.
+  // Usamos fs.promises.access (async) en lugar de existsSync (bloqueante).
+  try {
+    await fs.promises.access(localImagePath, fs.constants.R_OK);
+  } catch {
     return res.status(404).send(buildErrorPage('El archivo de imagen no se encontró. Es posible que haya sido eliminado. Genera la imagen de nuevo.'));
   }
 
@@ -94,8 +104,9 @@ router.post('/enviar-confirmacion', async (req, res) => {
     res.send(buildSentPage(nombre));
 
   } catch (err) {
-    console.error('[route /enviar-confirmacion]', err.message);
-    res.status(500).send(buildErrorPage(err.message));
+    // Log técnico completo en el servidor, mensaje genérico al cliente.
+    console.error('[route /enviar-confirmacion] Error interno:', err);
+    res.status(500).send(buildErrorPage('Error al enviar la imagen por WhatsApp. Comprueba que Evolution API está activo e inténtalo de nuevo.'));
   }
 });
 
@@ -106,7 +117,7 @@ function htmlHead(title) {
   return /* html */`
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} · BgRemove ComfyUI</title>
+    <title>${escapeHtml(title)} · BgRemove ComfyUI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css">
@@ -118,6 +129,7 @@ function htmlHead(title) {
  * @param {{nombre: string, telefono: string, outputUrl: string, outputFilename: string}} p
  */
 function buildResultPage({ nombre, telefono, outputUrl, outputFilename }) {
+  // IMPORTANTE: outputUrl se escapa para prevenir XSS en el atributo src
   return /* html */`<!DOCTYPE html>
 <html lang="es">
 <head>${htmlHead('Vista previa')}</head>
@@ -128,7 +140,7 @@ function buildResultPage({ nombre, telefono, outputUrl, outputFilename }) {
       <p>Revisa el resultado antes de enviarlo a ${escapeHtml(nombre)}</p>
     </header>
 
-    <img class="result-img" src="${outputUrl}" alt="Montaje generado para ${escapeHtml(nombre)}">
+    <img class="result-img" src="${escapeHtml(outputUrl)}" alt="Montaje generado para ${escapeHtml(nombre)}">
 
     <form action="/enviar-confirmacion" method="POST">
       <input type="hidden" name="telefono"       value="${escapeHtml(telefono)}">
@@ -137,11 +149,7 @@ function buildResultPage({ nombre, telefono, outputUrl, outputFilename }) {
       <button type="submit" id="btn-enviar">✅ Transmitir por WhatsApp</button>
     </form>
 
-    <a href="/"
-       style="display:block; margin-top:var(--space-4); color:var(--clr-accent-3);
-              text-align:center; text-decoration:none; font-size:var(--fs-sm); font-weight:600;">
-      ↩ Cancelar operación
-    </a>
+    <a href="/" class="link-back">↩ Cancelar operación</a>
   </div>
 </body>
 </html>`;
@@ -164,21 +172,18 @@ function buildSentPage(nombre) {
     <p class="status-msg status-msg--success">
       ✅ La imagen ha sido enviada por WhatsApp exitosamente.
     </p>
-    <a href="/"
-       style="display:block; margin-top:var(--space-5); color:var(--clr-accent-1);
-              text-align:center; text-decoration:none; font-size:var(--fs-base); font-weight:600;">
-      ↩ Procesar nueva imagen
-    </a>
+    <a href="/" class="link-back">↩ Procesar nueva imagen</a>
   </div>
 </body>
 </html>`;
 }
 
 /**
- * Página de error genérica. Muestra un mensaje amigable y una descripción técnica.
- * @param {string} technicalMessage - Mensaje del error capturado en el catch.
+ * Página de error genérica. Muestra un mensaje amigable al usuario sin exponer
+ * detalles técnicos internos del servidor.
+ * @param {string} userMessage - Mensaje descriptivo y seguro para mostrar al usuario.
  */
-function buildErrorPage(technicalMessage) {
+function buildErrorPage(userMessage) {
   return /* html */`<!DOCTYPE html>
 <html lang="es">
 <head>${htmlHead('Error')}</head>
@@ -189,13 +194,9 @@ function buildErrorPage(technicalMessage) {
       <p>Algo salió mal durante la generación o el envío</p>
     </header>
     <p class="status-msg status-msg--error">
-      ❌ ${escapeHtml(technicalMessage)}
+      ❌ ${escapeHtml(userMessage)}
     </p>
-    <a href="/"
-       style="display:block; margin-top:var(--space-5); color:var(--clr-accent-1);
-              text-align:center; text-decoration:none; font-size:var(--fs-base); font-weight:600;">
-      ↩ Volver al inicio e intentarlo de nuevo
-    </a>
+    <a href="/" class="link-back">↩ Volver al inicio e intentarlo de nuevo</a>
   </div>
 </body>
 </html>`;

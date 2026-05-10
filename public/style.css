@@ -497,3 +497,198 @@ form ~ img:hover {
     font-size: var(--fs-sm);
   }
 }
+
+
+/* --------------------------------------------------------------------------
+   14. UTILIDAD — Enlace de retorno en páginas de respuesta del servidor
+   Reemplaza los estilos inline que existían en el HTML generado dinámicamente.
+   -------------------------------------------------------------------------- */
+.link-back {
+  display: block;
+  margin-top: var(--space-5);
+  color: var(--clr-accent-1);
+  text-align: center;
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  transition: color var(--transition-fast), text-decoration var(--transition-fast);
+}
+
+.link-back:hover {
+  color: var(--clr-text-hi);
+  text-decoration: underline;
+}
+
+
+/* ==========================================================================
+   15. OVERLAY DE CARGA
+   Full-screen, sobre todo el contenido. Se activa añadiendo .is-visible.
+   Consistente con el design system (tokens del :root).
+   ========================================================================== */
+
+/* ── Capa base ─────────────────────────────────────────────────────────── */
+.loading-overlay {
+  /* Posicionado sobre todo el viewport */
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  /* Fondo oscuro con blur: el contenido detrás se intuye pero no distrae */
+  background: rgba(3, 7, 18, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* Layout centrado verticalmente */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+
+  /* Oculto por defecto: opacity 0 + pointer-events none */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 350ms ease;
+}
+
+/* Clase que activa la visibilidad */
+.loading-overlay.is-visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Anillo de pulso exterior ───────────────────────────────────────────── */
+.lo-ring {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.18);
+  animation: lo-pulse 2.4s ease-in-out infinite;
+}
+
+/* Segundo anillo desfasado para efecto de onda concéntrica */
+.lo-ring::after {
+  content: '';
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(56, 189, 248, 0.08);
+  animation: lo-pulse 2.4s ease-in-out 0.8s infinite;
+}
+
+@keyframes lo-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.6; }
+  50%       { transform: scale(1.18); opacity: 0.15; }
+}
+
+/* ── Icono SVG central giratorio ────────────────────────────────────────── */
+.lo-icon {
+  position: relative;         /* sobre el anillo */
+  width: 96px;
+  height: 96px;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-glow-blue);
+  animation: lo-float 3s ease-in-out infinite;
+}
+
+/* El círculo de trazos discontinuos del SVG rota de forma independiente */
+.lo-icon svg {
+  animation: lo-spin 8s linear infinite;
+}
+
+@keyframes lo-float {
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-6px); }
+}
+
+@keyframes lo-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Título "Procesando imagen..." ──────────────────────────────────────── */
+.lo-title {
+  font-family: var(--font-family);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--clr-text-hi);
+  letter-spacing: -0.01em;
+  text-align: center;
+  margin-top: var(--space-3);
+}
+
+/* Puntitos animados: aparecen secuencialmente con un bucle CSS */
+.lo-dots::after {
+  content: '';
+  animation: lo-dots-anim 1.6s steps(4, end) infinite;
+}
+
+@keyframes lo-dots-anim {
+  0%  { content: '';    }
+  25% { content: '.';   }
+  50% { content: '..';  }
+  75% { content: '...'; }
+}
+
+/* ── Mensaje de fase (cambia por JS) ────────────────────────────────────── */
+.lo-status {
+  font-size: var(--fs-sm);
+  color: var(--clr-accent-1);
+  letter-spacing: 0.03em;
+  text-align: center;
+  min-height: 1.4em;           /* evita saltos de layout al cambiar el texto */
+  transition: opacity 400ms ease;
+}
+
+/* ── Barra de progreso ──────────────────────────────────────────────────── */
+.lo-bar-wrap {
+  width: min(320px, 80vw);
+  height: 5px;
+  background: var(--clr-surface-alt);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+}
+
+.lo-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: var(--radius-pill);
+  /* Degradado de rojo a cyan para coherencia con el tema */
+  background: linear-gradient(90deg, var(--clr-accent-2), var(--clr-accent-1));
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+  /* La transición da suavidad al avance del porcentaje */
+  transition: width 900ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ── Nota de tiempo estimado ────────────────────────────────────────────── */
+.lo-note {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-lo);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ── Respeto a prefers-reduced-motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .lo-ring,
+  .lo-ring::after,
+  .lo-icon,
+  .lo-icon svg {
+    animation: none;
+  }
+  .lo-dots::after {
+    /* Muestra los tres puntos estáticos en lugar de animar */
+    content: '...';
+    animation: none;
+  }
+  .lo-bar-fill {
+    transition: none;
+  }
+}

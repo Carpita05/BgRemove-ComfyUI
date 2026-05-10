@@ -58,22 +58,23 @@ function formatPhoneNumber(rawPhone) {
 async function sendImageToContact(rawPhone, localImagePath, caption) {
   const phone = formatPhoneNumber(rawPhone);
 
-  // Leer la imagen del disco y convertirla a Base64
-  const imageBuffer  = fs.readFileSync(localImagePath);
-  const base64Image  = imageBuffer.toString('base64');
-  const mimeType     = _getMimeType(localImagePath);
+  // Leer la imagen del disco de forma asíncrona para no bloquear el event loop.
+  // Las imágenes de salida pueden pesar varios MB; readFileSync congela el servidor.
+  const imageBuffer = await fs.promises.readFile(localImagePath);
+  const base64Image = imageBuffer.toString('base64');
+  const mimeType    = _getMimeType(localImagePath);
 
   // Construir la URL del endpoint de Evolution API
   const url = `${config.EVOLUTION_BASE_URL}/message/sendMedia/${config.EVOLUTION_INSTANCE_NAME}`;
 
   // Cuerpo de la petición según la spec de Evolution API v2
   const body = {
-    number:  `${phone}@s.whatsapp.net`,
+    number:    `${phone}@s.whatsapp.net`,
     mediatype: 'image',
-    mimetype: mimeType,
-    caption:  caption ?? '',
-    media:    base64Image,
-    fileName: path.basename(localImagePath),
+    mimetype:  mimeType,
+    caption:   caption ?? '',
+    media:     base64Image,
+    fileName:  path.basename(localImagePath),
   };
 
   try {
